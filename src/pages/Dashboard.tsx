@@ -1,27 +1,46 @@
-import { useData } from "@/contexts/DataContext";
-import { STAGES } from "@/mock/mockLeads";
-import { mockActivities } from "@/mock/mockActivities";
-import { mockUsers } from "@/mock/mockUsers";
+import { useWorkspaces } from "@/hooks/useWorkspaces";
+import { useLeads, useFunnelStages } from "@/hooks/useLeads";
+import { useActivities } from "@/hooks/useActivities";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Plus, Send, Users, TrendingUp, Activity, ArrowRight } from "lucide-react";
+import { Plus, Send, Users, TrendingUp, Activity, ArrowRight, Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { formatDistanceToNow } from "date-fns";
+import { useMemo } from "react";
 
 export default function DashboardPage() {
-  const { leads } = useData();
   const navigate = useNavigate();
+  const { currentWorkspace, isLoading: isLoadingWS } = useWorkspaces();
+  const { leads, isLoading: isLoadingLeads } = useLeads(currentWorkspace?.id);
+  const { data: stages = [] } = useFunnelStages(currentWorkspace?.id);
+  const { data: activities = [] } = useActivities(currentWorkspace?.id);
 
-  const totalLeads = leads.length;
-  const stageCountMap = STAGES.map((stage) => ({
-    stage,
-    count: leads.filter((l) => l.stage === stage).length,
-  }));
-  const maxCount = Math.max(...stageCountMap.map((s) => s.count), 1);
+  const stats = useMemo(() => {
+    const total = leads.length;
+    // Common stages names for global stats
+    const qualifiedCount = leads.filter(l => l.stage_name === "Qualificado" || l.stage_name === "Reunião Agendada").length;
+    const outreachCount = leads.filter(l => l.stage_name === "Tentando Contato").length;
+    const meetingsCount = leads.filter(l => l.stage_name === "Reunião Agendada").length;
 
-  const recentActivities = mockActivities.slice(0, 6);
+    const funnelData = stages.map(stage => ({
+      name: stage.name,
+      count: leads.filter(l => l.stage_id === stage.id).length
+    }));
+
+    const max = Math.max(...funnelData.map(s => s.count), 1);
+
+    return { total, qualifiedCount, outreachCount, meetingsCount, funnelData, max };
+  }, [leads, stages]);
+
+  if (isLoadingWS || isLoadingLeads) {
+    return (
+      <div className="h-full w-full flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6 animate-slide-up">
@@ -29,7 +48,7 @@ export default function DashboardPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-medium text-foreground">Dashboard</h1>
-          <p className="text-muted-foreground text-sm">Convert more leads, faster.</p>
+          <p className="text-muted-foreground text-sm">Convert more leads, faster from {currentWorkspace?.name || 'your workspace'}.</p>
         </div>
         <div className="flex gap-2">
           <Button variant="secondary" onClick={() => navigate("/campaigns/new")} className="gap-2">
@@ -49,7 +68,7 @@ export default function DashboardPage() {
               <Users className="h-4 w-4 text-primary" />
             </div>
             <div>
-              <p className="text-2xl font-semibold tabular-nums text-foreground">{totalLeads}</p>
+              <p className="text-2xl font-semibold tabular-nums text-foreground">{stats.total}</p>
               <p className="text-xs text-muted-foreground">Total Leads</p>
             </div>
           </div>
@@ -60,9 +79,7 @@ export default function DashboardPage() {
               <TrendingUp className="h-4 w-4 text-primary" />
             </div>
             <div>
-              <p className="text-2xl font-semibold tabular-nums text-foreground">
-                {leads.filter((l) => l.stage === "Qualificado" || l.stage === "Reunião Agendada").length}
-              </p>
+              <p className="text-2xl font-semibold tabular-nums text-foreground">{stats.qualifiedCount}</p>
               <p className="text-xs text-muted-foreground">Qualified+</p>
             </div>
           </div>
@@ -73,9 +90,7 @@ export default function DashboardPage() {
               <Send className="h-4 w-4 text-primary" />
             </div>
             <div>
-              <p className="text-2xl font-semibold tabular-nums text-foreground">
-                {leads.filter((l) => l.stage === "Tentando Contato").length}
-              </p>
+              <p className="text-2xl font-semibold tabular-nums text-foreground">{stats.outreachCount}</p>
               <p className="text-xs text-muted-foreground">In Outreach</p>
             </div>
           </div>
@@ -86,9 +101,7 @@ export default function DashboardPage() {
               <Activity className="h-4 w-4 text-primary" />
             </div>
             <div>
-              <p className="text-2xl font-semibold tabular-nums text-foreground">
-                {leads.filter((l) => l.stage === "Reunião Agendada").length}
-              </p>
+              <p className="text-2xl font-semibold tabular-nums text-foreground">{stats.meetingsCount}</p>
               <p className="text-xs text-muted-foreground">Meetings Set</p>
             </div>
           </div>
@@ -101,13 +114,13 @@ export default function DashboardPage() {
         <Card className="col-span-2 p-5 bg-card border-border shadow-sdr-sm">
           <h2 className="text-sm font-medium text-foreground mb-4">Funnel Overview</h2>
           <div className="space-y-3">
-            {stageCountMap.map(({ stage, count }) => (
-              <div key={stage} className="flex items-center gap-3">
-                <span className="text-xs text-muted-foreground w-32 truncate">{stage}</span>
+            {stats.funnelData.map(({ name, count }) => (
+              <div key={name} className="flex items-center gap-3">
+                <span className="text-xs text-muted-foreground w-32 truncate">{name}</span>
                 <div className="flex-1 h-6 bg-muted rounded-sm overflow-hidden">
                   <div
                     className="h-full bg-primary/80 rounded-sm transition-all duration-300"
-                    style={{ width: `${(count / maxCount) * 100}%` }}
+                    style={{ width: `${(count / stats.max) * 100}%` }}
                   />
                 </div>
                 <span className="text-xs font-medium tabular-nums text-foreground w-6 text-right">{count}</span>
@@ -125,22 +138,31 @@ export default function DashboardPage() {
             </Button>
           </div>
           <div className="space-y-3">
-            {recentActivities.map((act) => {
-              const user = mockUsers.find((u) => u.id === act.userId);
-              return (
+            {activities.length === 0 ? (
+              <p className="text-xs text-muted-foreground italic text-center py-8">No recent activity found.</p>
+            ) : (
+              activities.map((act) => (
                 <div key={act.id} className="flex items-start gap-2">
-                  <Avatar className="h-6 w-6 mt-0.5">
-                    <AvatarFallback className="text-[10px] bg-secondary text-secondary-foreground">{user?.avatar}</AvatarFallback>
-                  </Avatar>
+                  <div className="h-6 w-6 rounded-full bg-secondary flex items-center justify-center mt-0.5">
+                    <Activity className="h-3 w-3 text-secondary-foreground" />
+                  </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs text-foreground truncate">{act.description}</p>
-                    <p className="text-[11px] text-muted-foreground">
-                      {formatDistanceToNow(new Date(act.timestamp), { addSuffix: true })}
+                    <p className="text-xs text-foreground font-medium">
+                      {act.action === 'stage_updated' && act.metadata?.lead_name 
+                        ? `${act.metadata.lead_name} moved to ${act.metadata.stage_name}`
+                        : act.action === 'ai_generation' && act.metadata?.lead_name
+                        ? `AI generated messages for ${act.metadata.lead_name}`
+                        : act.action === 'lead_created' && act.metadata?.lead_name
+                        ? `New lead: ${act.metadata.lead_name}`
+                        : act.action.replace('_', ' ')}
+                    </p>
+                    <p className="text-[10px] text-muted-foreground">
+                      {formatDistanceToNow(new Date(act.created_at), { addSuffix: true })}
                     </p>
                   </div>
                 </div>
-              );
-            })}
+              ))
+            )}
           </div>
         </Card>
       </div>

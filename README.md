@@ -1,73 +1,70 @@
-# Welcome to your Lovable project
+# 🚀 SDR Flow — Mini CRM com Gerador de Mensagens IA
 
-## Project info
+SDR Flow é um Mini CRM especializado para equipes de Pré-Vendas (SDR), focado em organizar leads e automatizar a geração de abordagens personalizadas utilizando Inteligência Artificial de última geração.
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+![SDR Flow Dashboard](https://cloud-3.lovable.app/projects/859866b0-e521-407c-b5d2-9f3821615e03/dashboard_mock.png)
 
-## How can I edit this code?
+## 📌 Links do Projeto
+- **Aplicação Publicada:** `[LINK_DO_DEPLOY_AQUI]`
+- **Vídeo de Demonstração:** `[LINK_DO_VIDEO_AQUI]`
 
-There are several ways of editing your application.
+## ✨ Funcionalidades Principais
 
-**Use Lovable**
+### ✅ Requisitos Obrigatórios
+- **Autenticação e Workspaces:** Gerenciamento de acessos via Supabase Auth com isolamento total de dados por Workspace.
+- **Gestão de Leads:** Cadastro completo com campos padrão (Nome, Email, Empresa, etc.) e suporte a **Campos Personalizados** por Workspace.
+- **Kanban de Vendas:** Visualização dinâmica do funil com suporte a **Drag and Drop** e persistência em tempo real.
+- **Gerador de Mensagens IA:** Integração com **Google Gemini 2.5 Flash Lite** para criar 3 variações de mensagens personalizadas baseadas no contexto da campanha e dados do lead.
+- **Regras de Funil:** Validação de campos obrigatórios antes da movimentação do lead para garantir qualidade nos dados da IA.
+- **Dashboard de Performance:** Visualização de métricas do funil, total de leads e log de atividades recentes.
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+### 🔥 Diferenciais Implementados
+- **Automação por Etapa Gatilho:** Geração automática de mensagens em background assim que o lead entra em uma etapa específica.
+- **Histórico de Atividades:** Registro detalhado de movimentações, criações e interações da IA.
+- **Segurança Avançada (RLS):** Implementação de Row Level Security no Supabase para garantir que usuários só acessem dados de seu próprio workspace.
+- **Arquitetura 2026:** Pronto para as versões mais recentes das APIs do Gemini e Supabase.
 
-Changes made via Lovable will be committed automatically to this repo.
+## 🛠️ Tecnologias Utilizadas
+- **Frontend:** React + TypeScript + Vite + Tailwind CSS + shadcn/ui.
+- **Backend/Database:** [Supabase](https://supabase.com/) (PostgreSQL, Auth, RLS).
+- **Inteligência Artificial:** [Google Gemini API](https://ai.google.dev/) (Modelo: 2.5 Flash Lite).
+- **Gerenciamento de Estado:** React Query (TanStack Query) para cache e sincronização.
+- **Produtividade IA:** Desenvolvido em regime de **Vibe Coding** utilizando Cursor AI e Google Antigravity.
 
-**Use your preferred IDE**
+## 📐 Decisões Técnicas
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+### 1. Estrutura do Banco de Dados
+O schema foi desenhado para suportar **Multi-tenancy** desde o dia 1. Cada lead, campanha ou configuração está vinculado a um `workspace_id`, e as políticas de RLS garantem que nenhum dado seja "vazado" entre equipes.
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+### 2. Integração com LLM (Gemini 2.5)
+Optamos pelo **Gemini 2.5 Flash Lite** pelo seu equilíbrio perfeito entre latência ultrabaixa e capacidade de raciocínio contextual. O sistema utiliza prompts estruturados para garantir que a IA mantenha o tom de voz da campanha.
 
-Follow these steps:
+### 3. Automação de Gatilho
+Implementamos uma camada de automação no frontend que dispara chamadas assíncronas para a IA sempre que um lead atinge estágios críticos (como "Lead Mapeado"), eliminando o trabalho manual de "clicar em gerar" para cada lead.
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+## 🚀 Como Executar o Projeto Localmente
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+1. **Clone o repositório:**
+   ```bash
+   git clone https://github.com/seu-usuario/funnel-friend-suite.git
+   ```
 
-# Step 3: Install the necessary dependencies.
-npm i
+2. **Instale as dependências:**
+   ```bash
+   npm install
+   ```
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
-```
+3. **Configure o arquivo `.env.local`:**
+   ```env
+   VITE_SUPABASE_URL=sua_url_do_supabase
+   VITE_SUPABASE_ANON_KEY=sua_chave_anon
+   VITE_GEMINI_API_KEY=sua_chave_do_gemini
+   ```
 
-**Edit a file directly in GitHub**
+4. **Inicie o servidor de desenvolvimento:**
+   ```bash
+   npm run dev
+   ```
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
-
-**Use GitHub Codespaces**
-
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
-
-## What technologies are used for this project?
-
-This project is built with:
-
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
-
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+---
+Desenvolvido com ❤️ por [Seu Nome/Ivo] para a Prova Técnica.

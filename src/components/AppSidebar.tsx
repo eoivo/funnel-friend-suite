@@ -22,8 +22,10 @@ const navItems = [
 ];
 
 export function AppSidebar() {
-  const { user, logout } = useAuth();
+  const { user, signOut } = useAuth();
   const [collapsed, setCollapsed] = useState(false);
+
+  const initials = user?.email?.slice(0, 2).toUpperCase() || "??";
 
   return (
     <aside
@@ -63,20 +65,20 @@ export function AppSidebar() {
           <div className="flex items-center gap-2 px-2 py-2">
             <Avatar className="h-7 w-7">
               <AvatarFallback className="bg-secondary text-secondary-foreground text-xs">
-                {user.avatar}
+                {initials}
               </AvatarFallback>
             </Avatar>
             {!collapsed && (
               <div className="flex-1 min-w-0">
-                <p className="text-xs font-medium truncate text-foreground">{user.name}</p>
+                <p className="text-xs font-medium truncate text-foreground">{user.email?.split('@')[0]}</p>
                 <p className="text-[11px] text-muted-foreground truncate">{user.email}</p>
               </div>
             )}
             <Button
               variant="ghost"
               size="icon"
-              className="h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground"
-              onClick={logout}
+              className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive"
+              onClick={() => signOut()}
             >
               <LogOut className="h-3.5 w-3.5" />
             </Button>

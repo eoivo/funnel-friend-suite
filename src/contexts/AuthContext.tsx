@@ -1,39 +1,41 @@
-import React, { createContext, useContext, useState, ReactNode } from "react";
-import { User, mockUsers } from "@/mock/mockUsers";
+import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { User } from "@supabase/supabase-js";
+import { supabase } from "@/lib/supabase";
 
 interface AuthContextType {
   user: User | null;
-  isAuthenticated: boolean;
-  login: (email: string, password: string) => boolean;
-  register: (name: string, email: string, password: string) => boolean;
-  logout: () => void;
+  loading: boolean;
+  signOut: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  const login = (email: string, _password: string) => {
-    const found = mockUsers.find((u) => u.email === email);
-    if (found) {
-      setUser(found);
-      return true;
-    }
-    // Allow any email for demo
-    setUser({ id: "user-demo", name: email.split("@")[0], email, avatar: email[0].toUpperCase() + (email[1]?.toUpperCase() || ""), role: "admin" });
-    return true;
+  useEffect(() => {
+    // Check active sessions and sets the user
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+      setLoading(false);
+    });
+
+    // Listen for changes on auth state (sign in, sign out, etc.)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+      setLoading(false);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const signOut = async () => {
+    await supabase.auth.signOut();
   };
-
-  const register = (name: string, email: string, _password: string) => {
-    setUser({ id: "user-new", name, email, avatar: name.slice(0, 2).toUpperCase(), role: "admin" });
-    return true;
-  };
-
-  const logout = () => setUser(null);
 
   return (
-    <AuthContext.Provider value={{ user, isAuthenticated: !!user, login, register, logout }}>
+    <AuthContext.Provider value={{ user, loading, signOut }}>
       {children}
     </AuthContext.Provider>
   );

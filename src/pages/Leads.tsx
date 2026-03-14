@@ -1,12 +1,14 @@
-import { useState } from "react";
-import { useData } from "@/contexts/DataContext";
-import { Lead, LeadStage, STAGES } from "@/mock/mockLeads";
-import { mockUsers } from "@/mock/mockUsers";
+import { useState, useMemo } from "react";
+import { useAuth } from "@/contexts/AuthContext";
+import { useWorkspaces } from "@/hooks/useWorkspaces";
+import { useLeads, useFunnelStages, Lead } from "@/hooks/useLeads";
+import { useCampaigns } from "@/hooks/useCampaigns";
+import { generateSDRMessages } from "@/lib/aiService";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Plus, Search } from "lucide-react";
+import { Plus, Search, Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import {
   DndContext,
@@ -18,15 +20,19 @@ import {
   useSensors,
   closestCorners,
   useDroppable,
-  useDraggable,
 } from "@dnd-kit/core";
+import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { toast } from "sonner";
+import { useRequiredFields } from "@/hooks/useSettings";
 
-function KanbanColumn({ stage, leads, children }: { stage: LeadStage; leads: Lead[]; children?: React.ReactNode }) {
-  const { setNodeRef, isOver } = useDroppable({ id: stage });
+function KanbanColumn({ stageId, stageName, leads, children }: { stageId: string; stageName: string; leads: Lead[]; children?: React.ReactNode }) {
+  const { setNodeRef, isOver } = useDroppable({ id: stageId, data: { stageId, stageName } });
 
   return (
     <div
@@ -37,22 +43,27 @@ function KanbanColumn({ stage, leads, children }: { stage: LeadStage; leads: Lea
     >
       <div className="flex items-center justify-between px-3 py-2 mb-2">
         <div className="flex items-center gap-2">
-          <h3 className="text-xs font-medium text-foreground">{stage}</h3>
+          <h3 className="text-xs font-medium text-foreground">{stageName}</h3>
           <span className="text-[11px] tabular-nums text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
             {leads.length}
           </span>
         </div>
       </div>
-      <div className="flex flex-col gap-2 px-1 pb-2 min-h-[100px]">{children}</div>
+      <div className="flex flex-col gap-2 px-1 pb-2 min-h-[100px]">
+        <SortableContext items={leads.map(l => l.id)} strategy={verticalListSortingStrategy}>
+          {children}
+        </SortableContext>
+      </div>
     </div>
   );
 }
 
 function LeadCard({ lead, isDragging }: { lead: Lead; isDragging?: boolean }) {
   const navigate = useNavigate();
-  const user = mockUsers.find((u) => u.id === lead.responsibleId);
+  const initials = lead.name.slice(0, 2).toUpperCase();
+  
   const daysInStage = Math.max(0, Math.floor(
-    (Date.now() - new Date(lead.lastActivity).getTime()) / (1000 * 60 * 60 * 24)
+    (Date.now() - new Date(lead.updated_at).getTime()) / (1000 * 60 * 60 * 24)
   ));
 
   return (
@@ -65,19 +76,19 @@ function LeadCard({ lead, isDragging }: { lead: Lead; isDragging?: boolean }) {
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium text-foreground truncate">{lead.name}</p>
-          <p className="text-xs text-muted-foreground truncate">{lead.company}</p>
+          <p className="text-xs text-muted-foreground truncate">{lead.company || "No Company"}</p>
         </div>
         <Avatar className="h-6 w-6 shrink-0">
           <AvatarFallback className="text-[10px] bg-secondary text-secondary-foreground">
-            {user?.avatar || "?"}
+            {initials}
           </AvatarFallback>
         </Avatar>
       </div>
       <div className="flex items-center justify-between mt-2">
-        <span className="text-[11px] text-muted-foreground tabular-nums">{daysInStage}d in stage</span>
-        {lead.customFields.segment && (
+        <span className="text-[11px] text-muted-foreground tabular-nums">{daysInStage}d since update</span>
+        {lead.origin && (
           <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4">
-            {lead.customFields.segment}
+            {lead.origin}
           </Badge>
         )}
       </div>
@@ -86,20 +97,37 @@ function LeadCard({ lead, isDragging }: { lead: Lead; isDragging?: boolean }) {
 }
 
 function DraggableLeadCard({ lead }: { lead: Lead }) {
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: lead.id });
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ 
+    id: lead.id, 
+    data: { lead } 
+  });
+  
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.3 : 1,
+  };
+
   return (
-    <div ref={setNodeRef} {...listeners} {...attributes} style={{ opacity: isDragging ? 0.3 : 1 }}>
-      <LeadCard lead={lead} />
+    <div ref={setNodeRef} style={style} {...listeners} {...attributes}>
+      <LeadCard lead={lead} isDragging={isDragging} />
     </div>
   );
 }
 
 export default function LeadsPage() {
-  const { leads, updateLeadStage, addLead } = useData();
+  const { currentWorkspace } = useWorkspaces();
+  const { user } = useAuth();
+  const { leads, isLoading, createLead, updateStage } = useLeads(currentWorkspace?.id);
+  const { data: stages = [] } = useFunnelStages(currentWorkspace?.id);
+  const { data: requiredFields = [] } = useRequiredFields(currentWorkspace?.id);
+  const { data: campaigns = [] } = useCampaigns(currentWorkspace?.id);
+  
   const [search, setSearch] = useState("");
-  const [filterUser, setFilterUser] = useState<string>("all");
   const [activeId, setActiveId] = useState<string | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
+  const [missingFields, setMissingFields] = useState<{leadName: string, destination: string, fields: string[]} | null>(null);
   const navigate = useNavigate();
 
   const [newLead, setNewLead] = useState({
@@ -108,39 +136,118 @@ export default function LeadsPage() {
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
-  const filteredLeads = leads.filter((l) => {
-    const matchSearch = !search || l.name.toLowerCase().includes(search.toLowerCase()) || l.company.toLowerCase().includes(search.toLowerCase());
-    const matchUser = filterUser === "all" || l.responsibleId === filterUser;
-    return matchSearch && matchUser;
-  });
+  const filteredLeads = useMemo(() => {
+    return leads.filter((l) => {
+      const matchSearch = !search || 
+        l.name.toLowerCase().includes(search.toLowerCase()) || 
+        (l.company?.toLowerCase().includes(search.toLowerCase()));
+      return matchSearch;
+    });
+  }, [leads, search]);
 
   const handleDragStart = (e: DragStartEvent) => setActiveId(e.active.id as string);
-  const handleDragEnd = (e: DragEndEvent) => {
+  
+  const handleDragEnd = async (e: DragEndEvent) => {
     setActiveId(null);
-    if (e.over) {
-      const overId = e.over.id as string;
-      if (STAGES.includes(overId as LeadStage)) {
-        updateLeadStage(e.active.id as string, overId as LeadStage);
+    const { active, over } = e;
+    
+    if (!over) return;
+    
+    const activeLead = leads.find(l => l.id === active.id);
+    if (!activeLead) return;
+    
+    let destinationStageId = over.data?.current?.stageId as string;
+    let destinationStageName = over.data?.current?.stageName as string;
+
+    if (!destinationStageId) {
+      const overLead = leads.find(l => l.id === over.id);
+      if (overLead) {
+        destinationStageId = overLead.stage_id;
+        destinationStageName = overLead.stage_name || "";
+      }
+    }
+    
+    if (!destinationStageId || destinationStageId === activeLead.stage_id) return;
+    
+    // Validation using our real required fields from the DB
+    const requiredForDest = requiredFields.filter(r => r.stage_id === destinationStageId).map(r => r.field_name);
+    const missing: string[] = [];
+    
+    requiredForDest.forEach(field => {
+       const val = activeLead[field as keyof Lead] || activeLead.custom_data?.[field];
+       if (!val || val === "") {
+         missing.push(field);
+       }
+    });
+    
+    if (missing.length > 0) {
+      setMissingFields({
+        leadName: activeLead.name,
+        destination: destinationStageName,
+        fields: missing
+      });
+      return;
+    }
+    
+    await updateStage({ leadId: activeLead.id, stageId: destinationStageId });
+
+    // AI Automation: Check for trigger campaigns
+    const triggerCampaigns = campaigns.filter(c => c.trigger_stage_id === destinationStageId);
+    if (triggerCampaigns.length > 0) {
+      toast.info(`Automating AI messages for ${activeLead.name}...`);
+      for (const campaign of triggerCampaigns) {
+        generateSDRMessages(activeLead, campaign).catch(console.error);
       }
     }
   };
 
-  const handleAddLead = () => {
-    const lead: Lead = {
-      id: `lead-${Date.now()}`,
-      ...newLead,
-      stage: "Base",
-      responsibleId: "user-1",
-      lastActivity: new Date().toISOString(),
-      createdAt: new Date().toISOString(),
-      customFields: {},
-    };
-    addLead(lead);
-    setNewLead({ name: "", email: "", phone: "", company: "", role: "", origin: "LinkedIn", notes: "" });
-    setSheetOpen(false);
+  const handleAddLead = async () => {
+    if (!currentWorkspace || !user) return;
+    setIsCreating(true);
+    try {
+      const baseStage = stages.find(s => s.position === 1);
+      
+      const createdLead = await createLead({
+        workspace_id: currentWorkspace.id,
+        stage_id: baseStage?.id,
+        assigned_to: user.id,
+        name: newLead.name,
+        email: newLead.email,
+        phone: newLead.phone,
+        company: newLead.company,
+        role: newLead.role,
+        origin: newLead.origin,
+        notes: newLead.notes,
+        custom_data: {},
+      });
+      
+      // AI Automation check for initial creation
+      if (baseStage?.id && createdLead) {
+        const triggerCampaigns = campaigns.filter(c => c.trigger_stage_id === baseStage.id);
+        if (triggerCampaigns.length > 0) {
+          toast.info(`Automating AI messages for ${createdLead.name}...`);
+          for (const campaign of triggerCampaigns) {
+             generateSDRMessages(createdLead, campaign).catch(console.error);
+          }
+        }
+      }
+
+      setNewLead({ name: "", email: "", phone: "", company: "", role: "", origin: "LinkedIn", notes: "" });
+      setSheetOpen(false);
+    } finally {
+      setIsCreating(false);
+    }
   };
 
   const activeLead = leads.find((l) => l.id === activeId);
+
+  if (isLoading) {
+    return (
+      <div className="h-full w-full flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="h-full flex flex-col">
@@ -157,17 +264,6 @@ export default function LeadsPage() {
               className="pl-8 h-8 w-52 bg-muted border-border text-sm"
             />
           </div>
-          <Select value={filterUser} onValueChange={setFilterUser}>
-            <SelectTrigger className="h-8 w-40 bg-muted border-border text-sm">
-              <SelectValue placeholder="Filter by user" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Users</SelectItem>
-              {mockUsers.map((u) => (
-                <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
           <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
             <SheetTrigger asChild>
               <Button className="h-8 gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90 text-sm">
@@ -204,8 +300,12 @@ export default function LeadsPage() {
                   <Label className="text-sm">Notes</Label>
                   <Textarea value={newLead.notes} onChange={(e) => setNewLead({ ...newLead, notes: e.target.value })} className="bg-muted border-border" />
                 </div>
-                <Button onClick={handleAddLead} className="w-full bg-primary text-primary-foreground hover:bg-primary/90">
-                  Add Lead
+                <Button 
+                  onClick={handleAddLead} 
+                  disabled={isCreating}
+                  className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
+                >
+                  {isCreating ? <Loader2 className="h-4 w-4 animate-spin" /> : "Add Lead"}
                 </Button>
               </div>
             </SheetContent>
@@ -217,10 +317,10 @@ export default function LeadsPage() {
       <div className="flex-1 overflow-x-auto p-4">
         <DndContext sensors={sensors} collisionDetection={closestCorners} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
           <div className="flex gap-3 h-full">
-            {STAGES.map((stage) => {
-              const stageLeads = filteredLeads.filter((l) => l.stage === stage);
+            {stages.map((stage) => {
+              const stageLeads = filteredLeads.filter((l) => l.stage_id === stage.id);
               return (
-                <KanbanColumn key={stage} stage={stage} leads={stageLeads}>
+                <KanbanColumn key={stage.id} stageId={stage.id} stageName={stage.name} leads={stageLeads}>
                   {stageLeads.map((lead) => (
                     <DraggableLeadCard key={lead.id} lead={lead} />
                   ))}
@@ -233,6 +333,33 @@ export default function LeadsPage() {
           </DragOverlay>
         </DndContext>
       </div>
+
+      <Dialog open={!!missingFields} onOpenChange={(o) => !o && setMissingFields(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Cannot move lead</DialogTitle>
+            <DialogDescription>
+              {missingFields?.leadName} is missing required fields for the "{missingFields?.destination}" stage.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 py-4">
+            <h4 className="text-sm font-medium">Missing fields:</h4>
+            <ul className="list-disc pl-5 text-sm text-destructive">
+              {missingFields?.fields.map(f => (
+                <li key={f} className="capitalize">{f}</li>
+              ))}
+            </ul>
+          </div>
+          <DialogFooter>
+            <Button onClick={() => setMissingFields(null)}>Close</Button>
+            <Button variant="secondary" onClick={() => {
+              const id = activeLead?.id;
+              setMissingFields(null);
+              if (id) navigate(`/leads/${id}`);
+            }}>Edit Lead</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

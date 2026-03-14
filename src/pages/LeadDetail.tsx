@@ -1,35 +1,42 @@
 import { useParams, useNavigate } from "react-router-dom";
-import { useData } from "@/contexts/DataContext";
-import { mockUsers } from "@/mock/mockUsers";
-import { mockActivities } from "@/mock/mockActivities";
-import { STAGES, LeadStage } from "@/mock/mockLeads";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Copy, Send, Sparkles, Mail, Phone, Building2, User, Globe, Clock } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { ArrowLeft, Copy, Send, Sparkles, Mail, Phone, Building2, User, Globe, Clock, Loader2, RefreshCcw } from "lucide-react";
 import { useState } from "react";
 import { formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
-
-const mockMessages = [
-  "Hi {{name}}, I noticed {{company}} is scaling rapidly in the {{segment}} space. Our SDR teams are seeing 3x reply rates with AI-powered outreach. Would you have 15 minutes this week for a quick chat?",
-  "Hey {{name}}, congrats on {{company}}'s growth! I work with {{segment}} companies to help their sales teams book more meetings with less effort. Interested in seeing how? Happy to share a quick case study.",
-  "{{name}}, quick question — how is your SDR team handling personalization at scale? We've helped companies like {{company}} cut research time by 80%. Worth a 15-min conversation?",
-];
+import { useLeadDetail } from "@/hooks/useCampaigns"; // I added it there earlier
+import { useLeads, useFunnelStages } from "@/hooks/useLeads";
+import { useWorkspaces } from "@/hooks/useWorkspaces";
+import { useCampaigns } from "@/hooks/useCampaigns";
+import { generateSDRMessages } from "@/lib/aiService";
 
 export default function LeadDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { leads, updateLeadStage, campaigns } = useData();
-  const lead = leads.find((l) => l.id === id);
-  const [selectedCampaign, setSelectedCampaign] = useState("");
+  const { currentWorkspace } = useWorkspaces();
+  const { data: lead, isLoading: isLoadingLead } = useLeadDetail(id);
+  const { updateStage } = useLeads(currentWorkspace?.id);
+  const { data: stages = [] } = useFunnelStages(currentWorkspace?.id);
+  const { data: campaigns = [] } = useCampaigns(currentWorkspace?.id);
+
+  const [selectedCampaignId, setSelectedCampaignId] = useState("");
   const [generatedMessages, setGeneratedMessages] = useState<string[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [messageToSend, setMessageToSend] = useState<string | null>(null);
+
+  if (isLoadingLead) {
+    return (
+      <div className="h-screen w-full flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   if (!lead) {
     return (
@@ -40,24 +47,25 @@ export default function LeadDetailPage() {
     );
   }
 
-  const user = mockUsers.find((u) => u.id === lead.responsibleId);
-  const leadActivities = mockActivities.filter((a) => a.leadId === lead.id);
-
-  const handleGenerate = () => {
-    if (!selectedCampaign) {
+  const handleGenerate = async () => {
+    if (!selectedCampaignId) {
       toast.error("Select a campaign first");
       return;
     }
+    
+    const campaign = campaigns.find(c => c.id === selectedCampaignId);
+    if (!campaign) return;
+
     setIsGenerating(true);
-    setTimeout(() => {
-      const messages = mockMessages.map((m) =>
-        m.replace(/\{\{name\}\}/g, lead.name.split(" ")[0])
-          .replace(/\{\{company\}\}/g, lead.company)
-          .replace(/\{\{segment\}\}/g, lead.customFields.segment || "tech")
-      );
+    try {
+      const { messages } = await generateSDRMessages(lead, campaign);
       setGeneratedMessages(messages);
+      toast.success("Messages generated with Gemini 2.0!");
+    } catch (error: any) {
+      toast.error(error.message || "Failed to generate messages");
+    } finally {
       setIsGenerating(false);
-    }, 800);
+    }
   };
 
   const handleCopy = (msg: string) => {
@@ -66,19 +74,36 @@ export default function LeadDetailPage() {
   };
 
   const handleSend = (msg: string) => {
-    updateLeadStage(lead.id, "Tentando Contato");
-    toast.success(`Message sent! Lead moved to "Tentando Contato"`);
-    setGeneratedMessages([]);
+    setMessageToSend(msg);
   };
 
-  const handleStageChange = (stage: LeadStage) => {
-    if (stage === "Qualificado" && !lead.customFields.annualRevenue) {
-      toast.error("Annual Revenue is required before qualifying a lead");
-      return;
+  const handleConfirmSend = async () => {
+    if (!messageToSend) return;
+    
+    try {
+      // Find "Tentando Contato" stage ID
+      const targetStage = stages.find(s => s.name === "Tentando Contato");
+      if (targetStage) {
+        await updateStage({ leadId: lead.id, stageId: targetStage.id });
+      }
+      
+      toast.success(`Message sent! Lead moved to "Tentando Contato"`);
+      setGeneratedMessages([]);
+      setMessageToSend(null);
+    } catch (error: any) {
+      toast.error("Failed to update lead stage after sending");
     }
-    updateLeadStage(lead.id, stage);
-    toast.success(`Stage updated to "${stage}"`);
   };
+
+  const handleStageChange = async (stageId: string) => {
+    try {
+      await updateStage({ leadId: lead.id, stageId });
+    } catch (error: any) {
+       // Error handled by hook
+    }
+  };
+
+  const initials = lead.name.split(" ").map((n) => n[0]).join("").toUpperCase();
 
   return (
     <div className="h-full overflow-auto">
@@ -97,7 +122,7 @@ export default function LeadDetailPage() {
                 <div className="flex items-center gap-3">
                   <Avatar className="h-10 w-10">
                     <AvatarFallback className="bg-primary/10 text-primary text-sm font-medium">
-                      {lead.name.split(" ").map((n) => n[0]).join("")}
+                      {initials}
                     </AvatarFallback>
                   </Avatar>
                   <div>
@@ -105,13 +130,13 @@ export default function LeadDetailPage() {
                     <p className="text-sm text-muted-foreground">{lead.role} at {lead.company}</p>
                   </div>
                 </div>
-                <Select value={lead.stage} onValueChange={(v) => handleStageChange(v as LeadStage)}>
+                <Select value={lead.stage_id} onValueChange={handleStageChange}>
                   <SelectTrigger className="w-48 bg-muted border-border">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {STAGES.map((s) => (
-                      <SelectItem key={s} value={s}>{s}</SelectItem>
+                    {stages.map((s) => (
+                      <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -122,12 +147,12 @@ export default function LeadDetailPage() {
             <Card className="p-5 bg-card border-border shadow-sdr-sm">
               <h2 className="text-sm font-medium text-foreground mb-3">Contact Details</h2>
               <div className="grid grid-cols-2 gap-4">
-                <InfoRow icon={Mail} label="Email" value={lead.email} />
-                <InfoRow icon={Phone} label="Phone" value={lead.phone} />
-                <InfoRow icon={Building2} label="Company" value={lead.company} />
-                <InfoRow icon={User} label="Role" value={lead.role} />
-                <InfoRow icon={Globe} label="Origin" value={lead.origin} />
-                <InfoRow icon={Clock} label="Created" value={formatDistanceToNow(new Date(lead.createdAt), { addSuffix: true })} />
+                <InfoRow icon={Mail} label="Email" value={lead.email || "—"} />
+                <InfoRow icon={Phone} label="Phone" value={lead.phone || "—"} />
+                <InfoRow icon={Building2} label="Company" value={lead.company || "—"} />
+                <InfoRow icon={User} label="Role" value={lead.role || "—"} />
+                <InfoRow icon={Globe} label="Origin" value={lead.origin || "—"} />
+                <InfoRow icon={Clock} label="Created" value={formatDistanceToNow(new Date(lead.created_at), { addSuffix: true })} />
               </div>
             </Card>
 
@@ -135,12 +160,16 @@ export default function LeadDetailPage() {
             <Card className="p-5 bg-card border-border shadow-sdr-sm">
               <h2 className="text-sm font-medium text-foreground mb-3">Custom Fields</h2>
               <div className="grid grid-cols-2 gap-4">
-                {Object.entries(lead.customFields).map(([key, value]) => (
-                  <div key={key}>
-                    <p className="text-xs text-muted-foreground capitalize">{key.replace(/([A-Z])/g, " $1")}</p>
-                    <p className="text-sm text-foreground">{value || "—"}</p>
-                  </div>
-                ))}
+                {lead.custom_data && Object.keys(lead.custom_data).length > 0 ? (
+                  Object.entries(lead.custom_data).map(([key, value]) => (
+                    <div key={key}>
+                      <p className="text-xs text-muted-foreground capitalize">{key.replace(/([A-Z])/g, " $1")}</p>
+                      <p className="text-sm text-foreground">{String(value) || "—"}</p>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-sm text-muted-foreground italic col-span-2">No custom data available.</p>
+                )}
               </div>
             </Card>
 
@@ -148,46 +177,6 @@ export default function LeadDetailPage() {
             <Card className="p-5 bg-card border-border shadow-sdr-sm">
               <h2 className="text-sm font-medium text-foreground mb-3">Notes</h2>
               <p className="text-sm text-muted-foreground">{lead.notes || "No notes yet."}</p>
-            </Card>
-
-            {/* Assigned */}
-            {user && (
-              <Card className="p-4 bg-card border-border shadow-sdr-sm">
-                <div className="flex items-center gap-3">
-                  <Avatar className="h-7 w-7">
-                    <AvatarFallback className="bg-secondary text-secondary-foreground text-xs">{user.avatar}</AvatarFallback>
-                  </Avatar>
-                  <div>
-                    <p className="text-xs text-muted-foreground">Assigned to</p>
-                    <p className="text-sm font-medium text-foreground">{user.name}</p>
-                  </div>
-                </div>
-              </Card>
-            )}
-
-            {/* Activity Timeline */}
-            <Card className="p-5 bg-card border-border shadow-sdr-sm">
-              <h2 className="text-sm font-medium text-foreground mb-3">Activity History</h2>
-              {leadActivities.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No activity yet.</p>
-              ) : (
-                <div className="space-y-3">
-                  {leadActivities.map((act) => {
-                    const actUser = mockUsers.find((u) => u.id === act.userId);
-                    return (
-                      <div key={act.id} className="flex items-start gap-3 relative pl-4 before:absolute before:left-0 before:top-0 before:bottom-0 before:w-px before:bg-border">
-                        <div className="absolute left-[-3px] top-1.5 h-1.5 w-1.5 rounded-full bg-primary" />
-                        <div>
-                          <p className="text-xs text-foreground">{act.description}</p>
-                          <p className="text-[11px] text-muted-foreground">
-                            {actUser?.name} · {formatDistanceToNow(new Date(act.timestamp), { addSuffix: true })}
-                          </p>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
             </Card>
           </div>
 
@@ -204,48 +193,88 @@ export default function LeadDetailPage() {
               <div className="space-y-3">
                 <div className="space-y-1.5">
                   <Label className="text-xs">Campaign</Label>
-                  <Select value={selectedCampaign} onValueChange={setSelectedCampaign}>
+                  <Select value={selectedCampaignId} onValueChange={setSelectedCampaignId}>
                     <SelectTrigger className="bg-muted border-border text-sm">
                       <SelectValue placeholder="Select a campaign" />
                     </SelectTrigger>
                     <SelectContent>
-                      {campaigns.map((c) => (
-                        <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                      ))}
+                      {campaigns.length > 0 ? (
+                        campaigns.map((c) => (
+                          <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                        ))
+                      ) : (
+                        <SelectItem value="_no_campaign" disabled>No active campaigns</SelectItem>
+                      )}
                     </SelectContent>
                   </Select>
                 </div>
 
                 <Button
                   onClick={handleGenerate}
-                  disabled={isGenerating}
+                  disabled={isGenerating || campaigns.length === 0}
                   className="w-full bg-primary text-primary-foreground hover:bg-primary/90 font-semibold"
                 >
-                  {isGenerating ? "Generating..." : "Generate Messages"}
+                  {isGenerating ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Generating...</> : "Generate Messages"}
                 </Button>
 
                 {generatedMessages.length > 0 && (
-                  <div className="space-y-3 mt-2">
-                    {generatedMessages.map((msg, i) => (
-                      <Card key={i} className="p-3 bg-muted border-border text-sm leading-relaxed text-foreground animate-slide-up">
-                        <p>{msg}</p>
-                        <div className="flex justify-end gap-2 mt-3">
-                          <Button size="sm" variant="ghost" className="h-7 text-xs gap-1 text-muted-foreground" onClick={() => handleCopy(msg)}>
-                            <Copy className="h-3 w-3" /> Copy
-                          </Button>
-                          <Button size="sm" variant="secondary" className="h-7 text-xs gap-1" onClick={() => handleSend(msg)}>
-                            <Send className="h-3 w-3" /> Send & Move
-                          </Button>
-                        </div>
-                      </Card>
-                    ))}
-                  </div>
+                  <>
+                    <div className="space-y-3 mt-4">
+                      {generatedMessages.map((msg, i) => (
+                        <Card key={i} className="p-3 bg-muted border-border text-sm leading-relaxed text-foreground animate-slide-up">
+                          <p>{msg}</p>
+                          <div className="flex justify-end gap-2 mt-3">
+                            <Button size="sm" variant="ghost" className="h-7 text-xs gap-1 text-muted-foreground" onClick={() => handleCopy(msg)}>
+                              <Copy className="h-3 w-3" /> Copy
+                            </Button>
+                            <Button size="sm" variant="secondary" className="h-7 text-xs gap-1" onClick={() => handleSend(msg)}>
+                              <Send className="h-3 w-3" /> Send
+                            </Button>
+                          </div>
+                        </Card>
+                      ))}
+                    </div>
+                    <Button 
+                      variant="outline" 
+                      onClick={handleGenerate} 
+                      disabled={isGenerating} 
+                      className="w-full mt-4 gap-2 border-border"
+                    >
+                      <RefreshCcw className={`h-4 w-4 ${isGenerating ? 'animate-spin' : ''}`} />
+                      Regenerate Options
+                    </Button>
+                  </>
+                )}
+                {campaigns.length === 0 && (
+                  <p className="text-[11px] text-muted-foreground text-center italic mt-2">
+                    Tip: Create a campaign in the "Campaigns" tab first.
+                  </p>
                 )}
               </div>
             </Card>
           </div>
         </div>
       </div>
+
+      <Dialog open={!!messageToSend} onOpenChange={(o) => !o && setMessageToSend(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Send Message</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to send this message to {lead?.name}? The lead will automatically be moved to "Tentando Contato".
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-3 px-4 bg-muted border border-border rounded-md text-sm mt-2 text-foreground">
+             {messageToSend}
+          </div>
+          <DialogFooter className="mt-4">
+            <Button variant="ghost" onClick={() => setMessageToSend(null)}>Cancel</Button>
+            <Button onClick={handleConfirmSend} className="gap-2">
+              <Send className="h-4 w-4" /> Send Message
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
