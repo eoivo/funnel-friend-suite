@@ -5,7 +5,7 @@ SDR Flow é um Mini CRM especializado para equipes de Pré-Vendas (SDR), focado 
 ![SDR Flow Dashboard](https://cloud-3.lovable.app/projects/859866b0-e521-407c-b5d2-9f3821615e03/dashboard_mock.png)
 
 ## 📌 Links do Projeto
-- **Aplicação Publicada:** `[LINK_DO_DEPLOY_AQUI]`
+- **Aplicação Publicada:** [https://funnel-friend-suite.vercel.app/](https://funnel-friend-suite.vercel.app/)
 - **Vídeo de Demonstração:** `[LINK_DO_VIDEO_AQUI]`
 
 ## ✨ Funcionalidades Principais
