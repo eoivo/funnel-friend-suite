@@ -113,14 +113,52 @@ export function useLeads(workspaceId?: string) {
     }
   });
 
+  const updateAssignmentMutation = useMutation({
+    mutationFn: async ({ leadId, userId }: { leadId: string; userId: string | null }) => {
+      const { data: lead, error: leadError } = await supabase
+        .from("leads")
+        .update({ assigned_to: userId })
+        .eq("id", leadId)
+        .select("*, profiles:assigned_to(full_name, email)")
+        .single();
+
+      if (leadError) throw leadError;
+
+      // Log activity
+      const { data: userData } = await supabase.auth.getUser();
+      if (userData.user) {
+        await supabase.from("activity_logs").insert({
+          workspace_id: workspaceId,
+          lead_id: leadId,
+          user_id: userData.user.id,
+          action: "assignment_updated",
+          metadata: { 
+            lead_name: lead.name, 
+            assigned_to_name: lead.profiles?.full_name || lead.profiles?.email || "Unassigned"
+          }
+        });
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["leads"] });
+      queryClient.invalidateQueries({ queryKey: ["activities"] });
+      toast.success("Lead assignment updated");
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Failed to update assignment");
+    }
+  });
+
   return {
     leads,
     isLoading,
     error,
     createLead: createLeadMutation.mutateAsync,
     updateStage: updateStageMutation.mutateAsync,
+    updateAssignment: updateAssignmentMutation.mutateAsync,
   };
 }
+
 
 export function useFunnelStages(workspaceId?: string) {
   return useQuery({

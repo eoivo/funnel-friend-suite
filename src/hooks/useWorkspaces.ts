@@ -18,6 +18,23 @@ export function useWorkspaces() {
   return {
     workspaces,
     isLoading,
-    currentWorkspace: workspaces[0] || null, // For MVP, we take the first one
+    currentWorkspace: workspaces[0] || null,
   };
+}
+
+export function useWorkspaceMembers(workspaceId?: string) {
+  return useQuery({
+    queryKey: ["workspace_members", workspaceId],
+    queryFn: async () => {
+      if (!workspaceId) return [];
+      const { data, error } = await supabase
+        .from("workspace_members")
+        .select("*, profiles(*)")
+        .eq("workspace_id", workspaceId);
+
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!workspaceId,
+  });
 }

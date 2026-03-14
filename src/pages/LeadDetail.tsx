@@ -12,7 +12,7 @@ import { formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
 import { useLeadDetail } from "@/hooks/useCampaigns"; // I added it there earlier
 import { useLeads, useFunnelStages } from "@/hooks/useLeads";
-import { useWorkspaces } from "@/hooks/useWorkspaces";
+import { useWorkspaces, useWorkspaceMembers } from "@/hooks/useWorkspaces";
 import { useCampaigns } from "@/hooks/useCampaigns";
 import { generateSDRMessages } from "@/lib/aiService";
 
@@ -21,9 +21,10 @@ export default function LeadDetailPage() {
   const navigate = useNavigate();
   const { currentWorkspace } = useWorkspaces();
   const { data: lead, isLoading: isLoadingLead } = useLeadDetail(id);
-  const { updateStage } = useLeads(currentWorkspace?.id);
+  const { updateStage, updateAssignment } = useLeads(currentWorkspace?.id);
   const { data: stages = [] } = useFunnelStages(currentWorkspace?.id);
   const { data: campaigns = [] } = useCampaigns(currentWorkspace?.id);
+  const { data: members = [] } = useWorkspaceMembers(currentWorkspace?.id);
 
   const [selectedCampaignId, setSelectedCampaignId] = useState("");
   const [generatedMessages, setGeneratedMessages] = useState<string[]>([]);
@@ -130,16 +131,38 @@ export default function LeadDetailPage() {
                     <p className="text-sm text-muted-foreground">{lead.role} at {lead.company}</p>
                   </div>
                 </div>
-                <Select value={lead.stage_id} onValueChange={handleStageChange}>
-                  <SelectTrigger className="w-48 bg-muted border-border">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {stages.map((s) => (
-                      <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <div className="flex items-center gap-3">
+                  <div className="flex flex-col gap-1.5 items-end">
+                    <Label className="text-[10px] text-muted-foreground uppercase tracking-wider">Funnel Stage</Label>
+                    <Select value={lead.stage_id} onValueChange={handleStageChange}>
+                      <SelectTrigger className="w-48 bg-muted border-border h-9">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {stages.map((s) => (
+                          <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div className="flex flex-col gap-1.5 items-end">
+                    <Label className="text-[10px] text-muted-foreground uppercase tracking-wider">Responsible</Label>
+                    <Select value={lead.assigned_to || "_unassigned"} onValueChange={(v) => updateAssignment({ leadId: lead.id, userId: v === "_unassigned" ? null : v })}>
+                      <SelectTrigger className="w-48 bg-muted border-border h-9">
+                        <SelectValue placeholder="Assign user" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="_unassigned">Unassigned</SelectItem>
+                        {members.map((m) => (
+                          <SelectItem key={m.user_id} value={m.user_id}>
+                            {m.profiles?.full_name || m.profiles?.email || 'User'}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
               </div>
             </Card>
 

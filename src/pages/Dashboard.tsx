@@ -112,20 +112,54 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Funnel Bar Chart */}
         <Card className="col-span-2 p-5 bg-card border-border shadow-sdr-sm">
-          <h2 className="text-sm font-medium text-foreground mb-4">Funnel Overview</h2>
-          <div className="space-y-3">
-            {stats.funnelData.map(({ name, count }) => (
-              <div key={name} className="flex items-center gap-3">
-                <span className="text-xs text-muted-foreground w-32 truncate">{name}</span>
-                <div className="flex-1 h-6 bg-muted rounded-sm overflow-hidden">
-                  <div
-                    className="h-full bg-primary/80 rounded-sm transition-all duration-300"
-                    style={{ width: `${(count / stats.max) * 100}%` }}
-                  />
-                </div>
-                <span className="text-xs font-medium tabular-nums text-foreground w-6 text-right">{count}</span>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-sm font-medium text-foreground">Funnel Overview</h2>
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-1.5">
+                <div className="h-2 w-2 rounded-full bg-primary" />
+                <span className="text-[10px] text-muted-foreground">Volume</span>
               </div>
-            ))}
+              <div className="text-[10px] font-medium text-primary bg-primary/10 px-1.5 py-0.5 rounded">
+                Total Conv: {stats.total > 0 ? ((stats.meetingsCount / stats.total) * 100).toFixed(1) : 0}%
+              </div>
+            </div>
+          </div>
+          
+          <div className="space-y-4">
+            {stats.funnelData.map((stage, i) => {
+              const prevStage = stats.funnelData[i - 1];
+              const conversion = prevStage && prevStage.count > 0 
+                ? ((stage.count / prevStage.count) * 100).toFixed(0) 
+                : null;
+
+              return (
+                <div key={stage.name} className="space-y-1">
+                  {conversion !== null && (
+                    <div className="flex justify-center -mt-2 mb-1">
+                      <div className="text-[9px] text-muted-foreground bg-muted px-2 py-0.5 rounded-full border border-border/50">
+                        ↓ {conversion}% conv.
+                      </div>
+                    </div>
+                  )}
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs text-muted-foreground w-32 truncate">{stage.name}</span>
+                    <div className="flex-1 h-7 bg-muted/50 rounded-md overflow-hidden relative border border-border/20">
+                      <div
+                        className="h-full bg-primary/70 rounded-sm transition-all duration-500 ease-out"
+                        style={{ width: `${(stage.count / stats.max) * 100}%` }}
+                      >
+                        <div className="absolute inset-0 bg-gradient-to-r from-white/10 to-transparent" />
+                      </div>
+                      {stage.count > 0 && (
+                        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-foreground/80">
+                          {stage.count}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </Card>
 
