@@ -6,9 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Plus, Search, GripVertical } from "lucide-react";
+import { Plus, Search } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { formatDistanceToNow } from "date-fns";
 import {
   DndContext,
   DragEndEvent,
@@ -18,8 +17,9 @@ import {
   useSensor,
   useSensors,
   closestCorners,
+  useDroppable,
+  useDraggable,
 } from "@dnd-kit/core";
-import { useDroppable } from "@dnd-kit/core";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -51,9 +51,9 @@ function KanbanColumn({ stage, leads, children }: { stage: LeadStage; leads: Lea
 function LeadCard({ lead, isDragging }: { lead: Lead; isDragging?: boolean }) {
   const navigate = useNavigate();
   const user = mockUsers.find((u) => u.id === lead.responsibleId);
-  const daysInStage = Math.floor(
+  const daysInStage = Math.max(0, Math.floor(
     (Date.now() - new Date(lead.lastActivity).getTime()) / (1000 * 60 * 60 * 24)
-  );
+  ));
 
   return (
     <div
@@ -85,6 +85,15 @@ function LeadCard({ lead, isDragging }: { lead: Lead; isDragging?: boolean }) {
   );
 }
 
+function DraggableLeadCard({ lead }: { lead: Lead }) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: lead.id });
+  return (
+    <div ref={setNodeRef} {...listeners} {...attributes} style={{ opacity: isDragging ? 0.3 : 1 }}>
+      <LeadCard lead={lead} />
+    </div>
+  );
+}
+
 export default function LeadsPage() {
   const { leads, updateLeadStage, addLead } = useData();
   const [search, setSearch] = useState("");
@@ -93,7 +102,6 @@ export default function LeadsPage() {
   const [sheetOpen, setSheetOpen] = useState(false);
   const navigate = useNavigate();
 
-  // New lead form state
   const [newLead, setNewLead] = useState({
     name: "", email: "", phone: "", company: "", role: "", origin: "LinkedIn", notes: "",
   });
@@ -109,8 +117,11 @@ export default function LeadsPage() {
   const handleDragStart = (e: DragStartEvent) => setActiveId(e.active.id as string);
   const handleDragEnd = (e: DragEndEvent) => {
     setActiveId(null);
-    if (e.over && e.active.id !== e.over.id) {
-      updateLeadStage(e.active.id as string, e.over.id as LeadStage);
+    if (e.over) {
+      const overId = e.over.id as string;
+      if (STAGES.includes(overId as LeadStage)) {
+        updateLeadStage(e.active.id as string, overId as LeadStage);
+      }
     }
   };
 
@@ -211,9 +222,7 @@ export default function LeadsPage() {
               return (
                 <KanbanColumn key={stage} stage={stage} leads={stageLeads}>
                   {stageLeads.map((lead) => (
-                    <div key={lead.id} id={lead.id} data-id={lead.id}>
-                      <DraggableLeadCard lead={lead} />
-                    </div>
+                    <DraggableLeadCard key={lead.id} lead={lead} />
                   ))}
                 </KanbanColumn>
               );
@@ -226,18 +235,4 @@ export default function LeadsPage() {
       </div>
     </div>
   );
-}
-
-function DraggableLeadCard({ lead }: { lead: Lead }) {
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggable(lead.id);
-  return (
-    <div ref={setNodeRef} {...listeners} {...attributes} style={{ opacity: isDragging ? 0.3 : 1 }}>
-      <LeadCard lead={lead} />
-    </div>
-  );
-}
-
-function useDraggable(id: string) {
-  const { attributes, listeners, setNodeRef, transform, isDragging } = require("@dnd-kit/core").useDraggable({ id });
-  return { attributes, listeners, setNodeRef, isDragging, transform };
 }
