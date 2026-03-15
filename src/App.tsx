@@ -23,7 +23,7 @@ const queryClient = new QueryClient();
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
-  
+
   if (loading) {
     return (
       <div className="h-screen w-screen flex items-center justify-center bg-background">
@@ -31,14 +31,14 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
       </div>
     );
   }
-  
+
   if (!user) return <Navigate to="/login" replace />;
   return <>{children}</>;
 }
 
 function AuthRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
-  
+
   if (loading) {
     return (
       <div className="h-screen w-screen flex items-center justify-center bg-background">
@@ -46,7 +46,7 @@ function AuthRoute({ children }: { children: React.ReactNode }) {
       </div>
     );
   }
-  
+
   if (user) return <Navigate to="/dashboard" replace />;
   return <>{children}</>;
 }
@@ -55,30 +55,57 @@ const App = () => (
   <QueryClientProvider client={queryClient}>
     <ThemeProvider>
       <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <AuthProvider>
-        <BrowserRouter>
-          <Routes>
-            <Route path="/" element={<Navigate to="/login" replace />} />
-            <Route path="/login" element={<AuthRoute><LoginPage /></AuthRoute>} />
-            <Route path="/register" element={<AuthRoute><RegisterPage /></AuthRoute>} />
-            <Route path="/forgot-password" element={<AuthRoute><ForgotPasswordPage /></AuthRoute>} />
-            <Route path="/reset-password" element={<AuthRoute><ResetPasswordPage /></AuthRoute>} />
-            <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
-              <Route path="/dashboard" element={<DashboardPage />} />
-              <Route path="/leads" element={<LeadsPage />} />
-              <Route path="/leads/:id" element={<LeadDetailPage />} />
-              <Route path="/campaigns" element={<CampaignsPage />} />
-              <Route path="/campaigns/new" element={<CampaignFormPage />} />
-              <Route path="/campaigns/:id" element={<CampaignFormPage />} />
-              <Route path="/settings" element={<SettingsPage />} />
-            </Route>
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </BrowserRouter>
-      </AuthProvider>
-    </TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <AuthProvider>
+          <BrowserRouter>
+            <Routes>
+              <Route path="/" element={<Navigate to="/login" replace />} />
+              <Route
+                path="/login"
+                element={
+                  <AuthRoute>
+                    <LoginPage />
+                  </AuthRoute>
+                }
+              />
+              <Route
+                path="/register"
+                element={
+                  <AuthRoute>
+                    <RegisterPage />
+                  </AuthRoute>
+                }
+              />
+              <Route
+                path="/forgot-password"
+                element={
+                  <AuthRoute>
+                    <ForgotPasswordPage />
+                  </AuthRoute>
+                }
+              />
+              <Route path="/reset-password" element={<ResetPasswordPage />} />
+              <Route
+                element={
+                  <ProtectedRoute>
+                    <AppLayout />
+                  </ProtectedRoute>
+                }
+              >
+                <Route path="/dashboard" element={<DashboardPage />} />
+                <Route path="/leads" element={<LeadsPage />} />
+                <Route path="/leads/:id" element={<LeadDetailPage />} />
+                <Route path="/campaigns" element={<CampaignsPage />} />
+                <Route path="/campaigns/new" element={<CampaignFormPage />} />
+                <Route path="/campaigns/:id" element={<CampaignFormPage />} />
+                <Route path="/settings" element={<SettingsPage />} />
+              </Route>
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </BrowserRouter>
+        </AuthProvider>
+      </TooltipProvider>
     </ThemeProvider>
   </QueryClientProvider>
 );
