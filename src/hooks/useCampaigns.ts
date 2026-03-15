@@ -113,3 +113,21 @@ export function useCampaignMutation(workspaceId?: string) {
 
   return { createCampaign, updateCampaign, deleteCampaign };
 }
+
+export function useGeneratedMessages(leadId?: string) {
+  return useQuery({
+    queryKey: ["generated_messages", leadId],
+    queryFn: async () => {
+      if (!leadId) return [];
+      const { data, error } = await supabase
+        .from("generated_messages")
+        .select("*")
+        .eq("lead_id", leadId)
+        .order("generated_at", { ascending: false });
+
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!leadId,
+  });
+}

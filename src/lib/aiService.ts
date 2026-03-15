@@ -8,19 +8,19 @@ export async function generateSDRMessages(lead: any, campaign: any) {
   }
 
   const prompt = `
-    You are an expert SDR (Sales Development Representative). 
-    Generate 3 distinct, personalized, and professional outreach messages for the lead below.
+    Você é um SDR (Sales Development Representative) especialista em prospecção.
+    Gere 3 mensagens de abordagem distintas, personalizadas e profissionais para o lead abaixo.
     
-    Campaign Context: ${campaign.context}
-    Campaign Instructions: ${campaign.generation_prompt}
+    Contexto da Campanha: ${campaign.context}
+    Instruções da Campanha: ${campaign.generation_prompt}
     
-    Lead Name: ${lead.name}
-    Lead Company: ${lead.company}
-    Lead Role: ${lead.role}
-    Notes/Context: ${lead.notes}
+    Nome do Lead: ${lead.name}
+    Empresa do Lead: ${lead.company}
+    Cargo: ${lead.role}
+    Notas/Contexto: ${lead.notes}
     
-    Return ONLY a valid JSON array containing 3 strings. 
-    Example: ["Message 1...", "Message 2...", "Message 3..."]
+    Retorne APENAS um array JSON válido contendo 3 strings.
+    Exemplo: ["Mensagem 1...", "Mensagem 2...", "Mensagem 3..."]
   `;
 
   try {
@@ -36,7 +36,7 @@ export async function generateSDRMessages(lead: any, campaign: any) {
     });
 
     const result = await response.json();
-    
+
     if (result.error) throw new Error(result.error.message);
 
     const text = result.candidates[0].content.parts[0].text;
@@ -63,7 +63,7 @@ export async function generateSDRMessages(lead: any, campaign: any) {
         lead_id: lead.id,
         user_id: userData.user.id,
         action: "ai_generation",
-        metadata: { 
+        metadata: {
           lead_name: lead.name,
           campaign_name: campaign.name
         }

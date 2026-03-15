@@ -1,18 +1,29 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/contexts/AuthContext";
 
 export function useWorkspaces() {
+  const { user } = useAuth();
+
   const { data: workspaces = [], isLoading } = useQuery({
-    queryKey: ["workspaces"],
+    queryKey: ["workspaces", user?.id],
     queryFn: async () => {
+      if (!user) return [];
       const { data, error } = await supabase
-        .from("workspaces")
-        .select("*, workspace_members!inner(*)")
-        .eq("workspace_members.user_id", (await supabase.auth.getUser()).data.user?.id);
+        .from("workspace_members")
+        .select("*, workspaces(*)")
+        .eq("user_id", user.id);
 
       if (error) throw error;
-      return data;
-    }
+      
+      // Map to return workspace objects with the membership info
+      return data.map(m => ({
+        ...m.workspaces,
+        role: m.role,
+        member_id: m.id
+      }));
+    },
+    enabled: !!user
   });
 
   return {

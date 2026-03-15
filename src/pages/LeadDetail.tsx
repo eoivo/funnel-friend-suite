@@ -7,15 +7,16 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { ArrowLeft, Copy, Send, Sparkles, Mail, Phone, Building2, User, Globe, Clock, Loader2, RefreshCcw, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { toast } from "sonner";
 import { useLeadDetail } from "@/hooks/useCampaigns"; // I added it there earlier
 import { useLeads, useFunnelStages } from "@/hooks/useLeads";
 import { useWorkspaces, useWorkspaceMembers } from "@/hooks/useWorkspaces";
-import { useCampaigns } from "@/hooks/useCampaigns";
+import { useCampaigns, useGeneratedMessages } from "@/hooks/useCampaigns";
 import { generateSDRMessages } from "@/lib/aiService";
+import { useQueryClient } from "@tanstack/react-query";
 
 import { PageHeader } from "@/components/PageHeader";
 
@@ -29,11 +30,21 @@ export default function LeadDetailPage() {
   const { data: campaigns = [] } = useCampaigns(currentWorkspace?.id);
   const { data: members = [] } = useWorkspaceMembers(currentWorkspace?.id);
 
+  const queryClient = useQueryClient();
+  const { data: allMessages = [], isLoading: isLoadingMessages } = useGeneratedMessages(id);
   const [selectedCampaignId, setSelectedCampaignId] = useState("");
-  const [generatedMessages, setGeneratedMessages] = useState<string[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [messageToSend, setMessageToSend] = useState<string | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+
+  // Auto-select latest campaign if messages exist
+  useEffect(() => {
+    if (allMessages.length > 0 && !selectedCampaignId) {
+      setSelectedCampaignId(allMessages[0].campaign_id);
+    }
+  }, [allMessages, selectedCampaignId]);
+
+  const currentMessages = allMessages.find(m => m.campaign_id === selectedCampaignId)?.messages || [];
 
   if (isLoadingLead) {
     return (
@@ -63,8 +74,8 @@ export default function LeadDetailPage() {
 
     setIsGenerating(true);
     try {
-      const { messages } = await generateSDRMessages(lead, campaign);
-      setGeneratedMessages(messages);
+      await generateSDRMessages(lead, campaign);
+      queryClient.invalidateQueries({ queryKey: ["generated_messages", id] });
       toast.success("Mensagens geradas com sucesso!");
     } catch (error: any) {
       toast.error(error.message || "Falha ao gerar mensagens");
@@ -88,7 +99,6 @@ export default function LeadDetailPage() {
       }
       
       toast.success(`Mensagem enviada! Lead movido para "Tentando Contato"`);
-      setGeneratedMessages([]);
       setMessageToSend(null);
     } catch (error: any) {
       toast.error("Falha ao atualizar etapa do lead");
@@ -296,7 +306,7 @@ export default function LeadDetailPage() {
                     {isGenerating ? <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Gerando...</> : "Gerar Abordagem"}
                   </Button>
 
-                  {generatedMessages.length > 0 && (
+                  {currentMessages.length > 0 && (
                     <div className="space-y-4 mt-6 sm:mt-8 animate-fade-in">
                       <div className="flex items-center gap-2 mb-2">
                         <div className="h-[1px] flex-1 bg-border" />
@@ -304,7 +314,7 @@ export default function LeadDetailPage() {
                         <div className="h-[1px] flex-1 bg-border" />
                       </div>
                       
-                      {generatedMessages.map((msg, i) => (
+                      {currentMessages.map((msg: string, i: number) => (
                         <Card key={i} className="p-4 sm:p-5 bg-muted border-border text-[13px] sm:text-sm leading-relaxed text-foreground rounded-xl sm:rounded-2xl group relative">
                           <p className="opacity-90">{msg}</p>
                           <div className="flex justify-end gap-2 mt-4 lg:opacity-0 lg:group-hover:opacity-100 transition-all">
@@ -329,6 +339,12 @@ export default function LeadDetailPage() {
                         <RefreshCcw className={`h-3 w-3 sm:h-3.5 sm:w-3.5 ${isGenerating ? 'animate-spin' : ''}`} />
                         Novas opções
                       </Button>
+                    </div>
+                  )}
+
+                  {isLoadingMessages && !isGenerating && (
+                    <div className="flex justify-center py-8">
+                       <Loader2 className="h-6 w-6 animate-spin text-primary/50" />
                     </div>
                   )}
 

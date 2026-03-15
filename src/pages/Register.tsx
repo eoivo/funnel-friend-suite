@@ -33,49 +33,25 @@ export default function RegisterPage() {
 
     try {
       // 1. Sign up the user
-      const { data: authData, error: authError } = await supabase.auth.signUp({
+      // Workspace and members are now handled by a DB trigger (handle_new_user)
+      const { error: authError } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          data: { full_name: name }
+          data: { 
+            full_name: name,
+            workspace_name: workspaceName
+          }
         }
       });
 
       if (authError) throw authError;
-      if (!authData.user) throw new Error("Could not create account");
 
-      const userId = authData.user.id;
-      const slug = workspaceName.toLowerCase().replace(/\s+/g, '-') + '-' + Math.random().toString(36).substring(2, 7);
-
-      // 2. Create Workspace
-      const { data: workspace, error: wsError } = await supabase
-        .from('workspaces')
-        .insert({ name: workspaceName, slug })
-        .select()
-        .single();
-
-      if (wsError) throw wsError;
-
-      // 3. Add as Admin Member
-      const { error: memberError } = await supabase
-        .from('workspace_members')
-        .insert({
-          workspace_id: workspace.id,
-          user_id: userId,
-          role: 'admin'
-        });
-
-      if (memberError) throw memberError;
-
-      // 4. Seed Default Stages
-      const { error: rpcError } = await supabase.rpc('seed_default_stages', { 
-        p_workspace_id: workspace.id 
-      });
-
-      if (rpcError) throw rpcError;
+      // 2. Sign out immediately as requested (Ensures they have to log in manually)
+      await supabase.auth.signOut();
       
-      toast.success("Workspace criado! Por favor, verifique seu e-mail e faça login.");
-      navigate("/login");
+      toast.success("Conta criada! Por favor, faça login com suas credenciais.");
+      navigate("/login", { state: { justRegistered: true } });
       
     } catch (error: any) {
       toast.error(translateAuthError(error));

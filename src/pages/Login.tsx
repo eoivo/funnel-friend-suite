@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, Link, useLocation } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,6 +15,8 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
+  const justRegistered = location.state?.justRegistered;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -28,7 +30,11 @@ export default function LoginPage() {
 
       if (error) throw error;
       
-      toast.success("Bem-vindo de volta!");
+      const message = justRegistered 
+        ? "Bem-vindo! Sua conta foi ativada com sucesso." 
+        : "Bem-vindo de volta!";
+
+      toast.success(message);
       navigate("/dashboard");
     } catch (error: any) {
       toast.error(translateAuthError(error));

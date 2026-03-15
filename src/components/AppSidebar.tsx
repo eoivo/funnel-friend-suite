@@ -84,7 +84,7 @@ export function AppSidebar({ collapsed, onSelect }: { collapsed: boolean; onSele
             {!collapsed && (
               <div className="flex-1 min-w-0">
                 <p className="text-xs font-bold truncate text-foreground leading-tight">
-                  {user.email?.split('@')[0]}
+                  {user.user_metadata?.full_name || user.email?.split('@')[0]}
                 </p>
                 <p className="text-[10px] text-muted-foreground truncate font-medium opacity-60">
                   {user.email}
