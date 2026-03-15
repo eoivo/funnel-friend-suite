@@ -18,6 +18,7 @@ export interface Lead {
   created_at: string;
   updated_at: string;
   stage_name?: string;
+  stage_color?: string;
   profiles?: {
     full_name: string | null;
     email: string | null;
@@ -33,7 +34,7 @@ export function useLeads(workspaceId?: string) {
       if (!workspaceId) return [];
       const { data, error } = await supabase
         .from("leads")
-        .select("*, funnel_stages(id, name), profiles(full_name, email)")
+        .select("*, funnel_stages(id, name, color), profiles(full_name, email)")
         .eq("workspace_id", workspaceId)
         .order("created_at", { ascending: false });
 
@@ -41,7 +42,8 @@ export function useLeads(workspaceId?: string) {
       
       return data.map(l => ({
         ...l,
-        stage_name: l.funnel_stages?.name || "Base"
+        stage_name: l.funnel_stages?.name || "Base",
+        stage_color: l.funnel_stages?.color
       })) as Lead[];
     },
     enabled: !!workspaceId,
@@ -72,8 +74,8 @@ export function useLeads(workspaceId?: string) {
       return lead;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["leads"] });
-      queryClient.invalidateQueries({ queryKey: ["activities"] });
+      queryClient.invalidateQueries({ queryKey: ["leads", workspaceId] });
+      queryClient.invalidateQueries({ queryKey: ["activities", workspaceId] });
       toast.success("Lead criado com sucesso!");
     },
     onError: (error: any) => {
@@ -107,9 +109,10 @@ export function useLeads(workspaceId?: string) {
         });
       }
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["leads"] });
-      queryClient.invalidateQueries({ queryKey: ["activities"] });
+    onSuccess: (_, { leadId }) => {
+      queryClient.invalidateQueries({ queryKey: ["leads", workspaceId] });
+      queryClient.invalidateQueries({ queryKey: ["lead", leadId] });
+      queryClient.invalidateQueries({ queryKey: ["activities", workspaceId] });
       toast.success("Etapa do lead atualizada!");
     },
     onError: (error: any) => {
@@ -143,9 +146,10 @@ export function useLeads(workspaceId?: string) {
         });
       }
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["leads"] });
-      queryClient.invalidateQueries({ queryKey: ["activities"] });
+    onSuccess: (_, { leadId }) => {
+      queryClient.invalidateQueries({ queryKey: ["leads", workspaceId] });
+      queryClient.invalidateQueries({ queryKey: ["lead", leadId] });
+      queryClient.invalidateQueries({ queryKey: ["activities", workspaceId] });
       toast.success("Responsável atualizado!");
     },
     onError: (error: any) => {
@@ -181,8 +185,8 @@ export function useLeads(workspaceId?: string) {
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["leads"] });
-      queryClient.invalidateQueries({ queryKey: ["activities"] });
+      queryClient.invalidateQueries({ queryKey: ["leads", workspaceId] });
+      queryClient.invalidateQueries({ queryKey: ["activities", workspaceId] });
       toast.success("Lead excluído com sucesso");
     },
     onError: (error: any) => {
@@ -206,9 +210,9 @@ export function useLeads(workspaceId?: string) {
       if (error) throw error;
       return data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["leads"] });
-      queryClient.invalidateQueries({ queryKey: ["lead"] });
+    onSuccess: ({ id }) => {
+      queryClient.invalidateQueries({ queryKey: ["leads", workspaceId] });
+      queryClient.invalidateQueries({ queryKey: ["lead", id] });
       toast.success("Lead atualizado com sucesso");
     },
     onError: (error: any) => {
@@ -230,7 +234,9 @@ export function useLeads(workspaceId?: string) {
 
 
 export function useFunnelStages(workspaceId?: string) {
-  return useQuery({
+  const queryClient = useQueryClient();
+
+  const query = useQuery({
     queryKey: ["funnel_stages", workspaceId],
     queryFn: async () => {
       if (!workspaceId) return [];
@@ -245,4 +251,28 @@ export function useFunnelStages(workspaceId?: string) {
     },
     enabled: !!workspaceId,
   });
+
+  const updateStage = useMutation({
+    mutationFn: async ({ id, updates }: { id: string; updates: { name?: string; color?: string; position?: number } }) => {
+      const { data, error } = await supabase
+        .from("funnel_stages")
+        .update(updates)
+        .eq("id", id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["funnel_stages", workspaceId] });
+      queryClient.invalidateQueries({ queryKey: ["leads", workspaceId] });
+      toast.success("Etapa atualizada com sucesso!");
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Falha ao atualizar etapa");
+    }
+  });
+
+  return { ...query, updateStage: updateStage.mutateAsync };
 }

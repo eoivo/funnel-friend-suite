@@ -11,6 +11,7 @@ import { useState, useEffect } from "react";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { toast } from "sonner";
+import { useCustomFields } from "@/hooks/useSettings";
 import { useLeadDetail } from "@/hooks/useCampaigns"; // I added it there earlier
 import { useLeads, useFunnelStages } from "@/hooks/useLeads";
 import { useWorkspaces, useWorkspaceMembers } from "@/hooks/useWorkspaces";
@@ -25,24 +26,58 @@ export default function LeadDetailPage() {
   const navigate = useNavigate();
   const { currentWorkspace } = useWorkspaces();
   const { data: lead, isLoading: isLoadingLead } = useLeadDetail(id);
-  const { updateStage, updateAssignment, deleteLead } = useLeads(currentWorkspace?.id);
-  const { data: stages = [] } = useFunnelStages(currentWorkspace?.id);
-  const { data: campaigns = [] } = useCampaigns(currentWorkspace?.id);
-  const { data: members = [] } = useWorkspaceMembers(currentWorkspace?.id);
-
   const queryClient = useQueryClient();
+  const leadWorkspaceId = lead?.workspace_id || currentWorkspace?.id;
+  const isAdmin = currentWorkspace?.role === 'admin';
+  
   const { data: allMessages = [], isLoading: isLoadingMessages } = useGeneratedMessages(id);
+  const { updateStage, updateAssignment, deleteLead } = useLeads(leadWorkspaceId);
+  const { data: stages = [] } = useFunnelStages(leadWorkspaceId);
+  const { data: campaigns = [] } = useCampaigns(leadWorkspaceId);
+  const { data: members = [] } = useWorkspaceMembers(leadWorkspaceId);
+  const { data: customFields = [] } = useCustomFields(leadWorkspaceId);
+  
   const [selectedCampaignId, setSelectedCampaignId] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
   const [messageToSend, setMessageToSend] = useState<string | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   // Auto-select latest campaign if messages exist
+  // We want to auto-select if:
+  // 1. No campaign is selected yet
+  // 2. A NEW generation just finished (the first message's ID has changed)
   useEffect(() => {
-    if (allMessages.length > 0 && !selectedCampaignId) {
-      setSelectedCampaignId(allMessages[0].campaign_id);
+    if (allMessages.length > 0) {
+      const latestCampaignId = allMessages[0].campaign_id;
+      if (!selectedCampaignId || allMessages[0].id !== queryClient.getQueryData(['last_seen_msg_id_' + id])) {
+        setSelectedCampaignId(latestCampaignId);
+        queryClient.setQueryData(['last_seen_msg_id_' + id], allMessages[0].id);
+      }
     }
-  }, [allMessages, selectedCampaignId]);
+  }, [allMessages, id, queryClient]);
+
+  const handleStageChange = async (newStageId: string) => {
+    try {
+      await updateStage({ leadId: lead.id, stageId: newStageId });
+      
+      // Look for automatic triggers for this specific stage
+      const triggerCampaigns = campaigns.filter(c => c.trigger_stage_id === newStageId);
+      
+      if (triggerCampaigns.length > 0) {
+        toast.info(`Automatizando as mensagens com IA para ${lead.name}...`);
+        for (const campaign of triggerCampaigns) {
+          try {
+            await generateSDRMessages(lead, campaign);
+            queryClient.invalidateQueries({ queryKey: ["generated_messages", id] });
+          } catch (e) {
+            console.error("Auto-generation error:", e);
+          }
+        }
+      }
+    } catch (error) {
+      console.error(error);
+    }
+  };
 
   const currentMessages = allMessages.find(m => m.campaign_id === selectedCampaignId)?.messages || [];
 
@@ -98,7 +133,6 @@ export default function LeadDetailPage() {
         await updateStage({ leadId: lead.id, stageId: targetStage.id });
       }
       
-      toast.success(`Mensagem enviada! Lead movido para "Tentando Contato"`);
       setMessageToSend(null);
     } catch (error: any) {
       toast.error("Falha ao atualizar etapa do lead");
@@ -162,7 +196,7 @@ export default function LeadDetailPage() {
                   <div className="flex flex-col sm:flex-row items-center gap-3 sm:gap-4 w-full sm:w-auto mt-2 sm:mt-0 pt-4 sm:pt-0 border-t sm:border-t-0 border-border">
                     <div className="space-y-1.5 w-full sm:w-40">
                       <Label className="text-[9px] sm:text-[10px] text-muted-foreground uppercase tracking-widest font-bold ml-1">Etapa</Label>
-                      <Select value={lead.stage_id} onValueChange={(v) => updateStage({ leadId: lead.id, stageId: v })}>
+                      <Select value={lead.stage_id} onValueChange={handleStageChange}>
                         <SelectTrigger className="w-full bg-muted border-border h-10 sm:h-11 rounded-xl font-bold">
                           <SelectValue />
                         </SelectTrigger>
@@ -176,17 +210,27 @@ export default function LeadDetailPage() {
                     
                     <div className="space-y-1.5 w-full sm:w-40">
                       <Label className="text-[9px] sm:text-[10px] text-muted-foreground uppercase tracking-widest font-bold ml-1">Responsável</Label>
-                      <Select value={lead.assigned_to || "_unassigned"} onValueChange={(v) => updateAssignment({ leadId: lead.id, userId: v === "_unassigned" ? null : v })}>
+                      <Select 
+                        value={(lead.assigned_to as string) || "_unassigned"} 
+                        onValueChange={(v: string) => updateAssignment({ leadId: lead.id, userId: v === "_unassigned" ? null : v })}
+                        disabled={isLoadingLead}
+                      >
                         <SelectTrigger className="w-full bg-muted border-border h-10 sm:h-11 rounded-xl font-bold">
-                          <SelectValue placeholder="Atribuir..." />
+                          <SelectValue placeholder={isLoadingLead ? "Carregando..." : "Atribuir..."} />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="_unassigned">Sem responsável</SelectItem>
-                          {members.map((m) => (
-                            <SelectItem key={m.user_id} value={m.user_id}>
-                              {m.profiles?.full_name || m.profiles?.email?.split('@')[0] || 'Usuário'}
-                            </SelectItem>
-                          ))}
+                          {members.length === 0 ? (
+                            <SelectItem value="_loading" disabled>Carregando membros...</SelectItem>
+                          ) : (
+                            <>
+                              <SelectItem value="_unassigned">Sem responsável</SelectItem>
+                              {members.map((m) => (
+                                <SelectItem key={m.user_id} value={m.user_id}>
+                                  {m.profiles?.full_name || m.profiles?.email?.split('@')[0] || 'Usuário'}
+                                </SelectItem>
+                              ))}
+                            </>
+                          )}
                         </SelectContent>
                       </Select>
                     </div>
@@ -215,12 +259,19 @@ export default function LeadDetailPage() {
                   </h2>
                   <div className="space-y-3 sm:space-y-4">
                     {lead.custom_data && Object.keys(lead.custom_data).length > 0 ? (
-                      Object.entries(lead.custom_data).map(([key, value]) => (
-                        <div key={key} className="p-2 sm:p-3 bg-muted rounded-xl border border-border">
-                          <p className="text-[8px] sm:text-[9px] text-muted-foreground uppercase font-black tracking-wider mb-1">{key.replace(/([A-Z])/g, " $1")}</p>
-                          <p className="text-xs sm:text-sm text-foreground font-medium">{String(value) || "—"}</p>
-                        </div>
-                      ))
+                      Object.entries(lead.custom_data).map(([key, value]) => {
+                        const fieldDef = customFields.find((f: any) => f.field_key === key);
+                        const label = fieldDef ? fieldDef.name : key.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase());
+                        
+                        return (
+                          <div key={key} className="p-2 sm:p-3 bg-muted rounded-xl border border-border">
+                            <p className="text-[8px] sm:text-[9px] text-muted-foreground uppercase font-black tracking-wider mb-1">
+                              {label}
+                            </p>
+                            <p className="text-xs sm:text-sm text-foreground font-medium">{String(value) || "—"}</p>
+                          </div>
+                        );
+                      })
                     ) : (
                       <div className="text-center py-6 sm:py-8 bg-muted rounded-2xl border border-dashed border-border/10">
                         <p className="text-[10px] sm:text-xs text-muted-foreground italic">Nenhum dado capturado.</p>
@@ -241,23 +292,25 @@ export default function LeadDetailPage() {
               </Card>
 
               {/* Danger Zone */}
-              <Card className="p-4 sm:p-6 border-destructive/20 bg-destructive/5 rounded-2xl">
-                <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-                  <div>
-                    <h2 className="text-[10px] sm:text-[11px] font-black text-destructive uppercase tracking-widest mb-1 flex items-center gap-2">
-                       Zona de Risco
-                    </h2>
-                    <p className="text-xs text-muted-foreground">Excluir permanentemente este lead e todo o seu histórico.</p>
+              {isAdmin && (
+                <Card className="p-4 sm:p-6 border-destructive/20 bg-destructive/5 rounded-2xl">
+                  <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                    <div>
+                      <h2 className="text-[10px] sm:text-[11px] font-black text-destructive uppercase tracking-widest mb-1 flex items-center gap-2">
+                         Zona de Risco
+                      </h2>
+                      <p className="text-xs text-muted-foreground">Excluir permanentemente este lead e todo o seu histórico.</p>
+                    </div>
+                    <Button 
+                      variant="outline" 
+                      onClick={() => setShowDeleteDialog(true)}
+                      className="w-full sm:w-auto border-destructive/20 text-destructive hover:bg-destructive hover:text-white transition-all font-bold gap-2"
+                    >
+                      <Trash2 className="h-4 w-4" /> Excluir Lead
+                    </Button>
                   </div>
-                  <Button 
-                    variant="outline" 
-                    onClick={() => setShowDeleteDialog(true)}
-                    className="w-full sm:w-auto border-destructive/20 text-destructive hover:bg-destructive hover:text-white transition-all font-bold gap-2"
-                  >
-                    <Trash2 className="h-4 w-4" /> Excluir Lead
-                  </Button>
-                </div>
-              </Card>
+                </Card>
+              )}
             </div>
 
             {/* Right: AI Generator */}

@@ -30,9 +30,9 @@ export default function LoginPage() {
 
       if (error) throw error;
       
-      const message = justRegistered 
-        ? "Bem-vindo! Sua conta foi ativada com sucesso." 
-        : "Bem-vindo de volta!";
+      let message = "Bem-vindo de volta!";
+      if (justRegistered) message = "Bem-vindo! Sua conta foi ativada com sucesso.";
+      if (location.state?.justConfirmedInvite) message = "Bem-vindo ao time! Sua conta foi ativada.";
 
       toast.success(message);
       navigate("/dashboard");

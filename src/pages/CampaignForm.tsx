@@ -58,7 +58,7 @@ export default function CampaignFormPage() {
         name: form.name,
         context: form.context,
         generation_prompt: form.generation_prompt,
-        trigger_stage_id: form.trigger_stage_id || null, // Ensure null if empty
+        trigger_stage_id: (form.trigger_stage_id === "_no_trigger" || !form.trigger_stage_id) ? null : form.trigger_stage_id,
       };
 
       if (isEdit && id) {
@@ -66,14 +66,12 @@ export default function CampaignFormPage() {
           id, 
           updates: payload 
         });
-        toast.success("Campanha atualizada!");
       } else {
         await createCampaign.mutateAsync({
           workspace_id: currentWorkspace.id,
           ...payload,
           is_active: true
         });
-        toast.success("Campanha criada!");
       }
       navigate("/campaigns");
     } catch (error: any) {

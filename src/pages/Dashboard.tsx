@@ -20,22 +20,64 @@ export default function DashboardPage() {
   const { data: stages = [] } = useFunnelStages(currentWorkspace?.id);
   const { data: activities = [] } = useActivities(currentWorkspace?.id);
 
-  const stats = useMemo(() => {
-    const total = leads.length;
-    // Common stages names for global stats
-    const qualifiedCount = leads.filter(l => l.stage_name === "Qualificado" || l.stage_name === "Reunião Agendada").length;
-    const outreachCount = leads.filter(l => l.stage_name === "Tentando Contato").length;
-    const meetingsCount = leads.filter(l => l.stage_name === "Reunião Agendada").length;
+    const stats = useMemo(() => {
+      const total = leads.length;
+      
+      const getStagePos = (name: string) => stages.find(s => s.name === name)?.position || 0;
+      
+      const posOutreach = getStagePos("Tentando Contato");
+      const posQualified = getStagePos("Qualificado");
+      const posMeeting = getStagePos("Reunião Agendada");
 
-    const funnelData = stages.map(stage => ({
-      name: stage.name,
-      count: leads.filter(l => l.stage_id === stage.id).length
-    }));
+      const cumulativeOutreach = leads.filter(l => {
+        const s = stages.find(st => st.id === l.stage_id);
+        return s && s.position >= posOutreach;
+      }).length;
 
-    const max = Math.max(...funnelData.map(s => s.count), 1);
+      const cumulativeQualified = leads.filter(l => {
+        const s = stages.find(st => st.id === l.stage_id);
+        return s && s.position >= posQualified;
+      }).length;
 
-    return { total, qualifiedCount, outreachCount, meetingsCount, funnelData, max };
-  }, [leads, stages]);
+      const cumulativeMeeting = leads.filter(l => {
+        const s = stages.find(st => st.id === l.stage_id);
+        return s && s.position >= posMeeting;
+      }).length;
+
+      const currentOutreach = leads.filter(l => l.stage_name === "Tentando Contato").length;
+      const currentQualified = leads.filter(l => l.stage_name === "Qualificado").length;
+      const currentMeeting = leads.filter(l => l.stage_name === "Reunião Agendada").length;
+
+      const funnelData = stages.map(stage => {
+        const isDisqualifiedStage = stage.name.toLowerCase().includes("desqualificado");
+        const cumulativeCount = leads.filter(l => {
+          const leadStage = stages.find(s => s.id === l.stage_id);
+          if (!leadStage) return false;
+          if (isDisqualifiedStage) return leadStage.id === stage.id;
+          return leadStage.position >= stage.position;
+        }).length;
+
+        return {
+          name: stage.name,
+          count: cumulativeCount,
+          actualCount: leads.filter(l => l.stage_id === stage.id).length
+        };
+      });
+
+      const max = Math.max(...funnelData.map(s => s.count), 1);
+
+      return { 
+        total, 
+        qualifiedCount: cumulativeQualified, 
+        currentQualified,
+        outreachCount: cumulativeOutreach, 
+        currentOutreach,
+        meetingsCount: cumulativeMeeting,
+        currentMeeting,
+        funnelData, 
+        max 
+      };
+    }, [leads, stages]);
 
   if (isLoadingWS || isLoadingLeads) {
     return (
@@ -65,9 +107,9 @@ export default function DashboardPage() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         {[
           { label: "Leads", value: stats.total, icon: Users, color: "primary" },
-          { label: "Qualificados", value: stats.qualifiedCount, icon: TrendingUp, color: "primary" },
-          { label: "Prospecção", value: stats.outreachCount, icon: Send, color: "primary" },
-          { label: "Reuniões", value: stats.meetingsCount, icon: Activity, color: "primary" },
+          { label: "Qualificados", value: stats.qualifiedCount, current: stats.currentQualified, icon: TrendingUp, color: "primary" },
+          { label: "Prospecção", value: stats.outreachCount, current: stats.currentOutreach, icon: Send, color: "primary" },
+          { label: "Reuniões", value: stats.meetingsCount, current: stats.currentMeeting, icon: Activity, color: "primary" },
         ].map((stat) => (
           <Card key={stat.label} className="p-3 sm:p-4 glass-card shadow-sdr-sm border-border/50 transition-all hover:border-primary/20">
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4">
@@ -75,7 +117,12 @@ export default function DashboardPage() {
                 <stat.icon className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
               </div>
               <div className="min-w-0">
-                <p className="text-xl sm:text-2xl font-bold tabular-nums text-foreground tracking-tight truncate">{stat.value}</p>
+                <div className="flex items-baseline gap-1.5">
+                  <p className="text-xl sm:text-2xl font-bold tabular-nums text-foreground tracking-tight">{stat.value}</p>
+                  {stat.current !== undefined && stat.current > 0 && (
+                    <span className="text-[10px] sm:text-xs font-bold text-primary/60">({stat.current})</span>
+                  )}
+                </div>
                 <p className="text-[9px] sm:text-[10px] uppercase font-semibold text-muted-foreground tracking-wider truncate">{stat.label}</p>
               </div>
             </div>
@@ -118,7 +165,10 @@ export default function DashboardPage() {
                   )}
                   <div className="flex items-center gap-2 sm:gap-3">
                     <span className="text-[10px] sm:text-xs text-muted-foreground w-20 sm:w-32 truncate">{stage.name}</span>
-                    <div className="flex-1 h-6 sm:h-7 bg-muted/50 rounded-md overflow-hidden relative border border-border/20">
+                    <div 
+                      className="flex-1 h-6 sm:h-7 bg-muted/50 rounded-md overflow-hidden relative border border-border/20 group/bar"
+                      title={`${stage.actualCount} leads parados nesta etapa`}
+                    >
                       <div
                         className="h-full bg-primary/70 rounded-sm transition-all duration-500 ease-out"
                         style={{ width: `${(stage.count / stats.max) * 100}%` }}
@@ -127,7 +177,7 @@ export default function DashboardPage() {
                       </div>
                       {stage.count > 0 && (
                         <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[9px] sm:text-[10px] font-bold text-foreground/80">
-                          {stage.count}
+                          {stage.count} {stage.actualCount > 0 && <span className="opacity-50 font-normal ml-1">({stage.actualCount})</span>}
                         </span>
                       )}
                     </div>

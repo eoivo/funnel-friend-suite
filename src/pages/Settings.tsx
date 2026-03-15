@@ -9,13 +9,128 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Trash2, Loader2 } from "lucide-react";
+import { Plus, Trash2, Loader2, Pencil, Check, X } from "lucide-react";
 import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { cn } from "@/lib/utils";
 
 import { PageHeader } from "@/components/PageHeader";
 
 const STANDARD_FIELDS = ["name", "email", "phone", "company", "role", "origin"];
+
+const PRESET_COLORS = [
+  "#10b981", // Emerald (Primary)
+  "#3b82f6", // Blue
+  "#8b5cf6", // Violet
+  "#ec4899", // Pink
+  "#f59e0b", // Amber
+  "#ef4444", // Red
+  "#06b6d4", // Cyan
+  "#71717a", // Zinc
+];
+
+function StageItem({ stage, index, workspaceId }: { stage: any; index: number; workspaceId?: string }) {
+  const { updateStage } = useFunnelStages(workspaceId);
+  const [isEditing, setIsEditing] = useState(false);
+  const [name, setName] = useState(stage.name);
+  const [color, setColor] = useState(stage.color);
+  const [isUpdating, setIsUpdating] = useState(false);
+
+  const handleUpdate = async () => {
+    if (!name.trim()) return;
+    setIsUpdating(true);
+    try {
+      await updateStage({ id: stage.id, updates: { name, color } });
+      setIsEditing(false);
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  return (
+    <div className={cn(
+      "flex items-center gap-3 sm:gap-5 py-3 px-4 sm:py-5 sm:px-6 rounded-xl sm:rounded-2xl border transition-all",
+      isEditing ? "bg-muted border-primary/30 shadow-glow" : "bg-muted border-border"
+    )}>
+      <span className="text-xs sm:text-sm font-black text-primary tabular-nums h-7 w-7 sm:h-8 sm:w-8 rounded-lg sm:rounded-xl bg-primary/10 flex items-center justify-center border border-primary/20 shrink-0">
+        {index + 1}
+      </span>
+
+      {isEditing ? (
+        <div className="flex-1 space-y-3">
+          <Input 
+            value={name} 
+            onChange={(e) => setName(e.target.value)}
+            className="bg-background border-border h-9 rounded-lg font-bold"
+            autoFocus
+          />
+          <div className="flex flex-wrap gap-1.5 pb-1">
+            {PRESET_COLORS.map((c) => (
+              <button
+                key={c}
+                onClick={() => setColor(c)}
+                className={cn(
+                  "h-5 w-5 rounded-full border-2 transition-transform hover:scale-110",
+                  color === c ? "border-foreground" : "border-transparent"
+                )}
+                style={{ backgroundColor: c }}
+              />
+            ))}
+          </div>
+        </div>
+      ) : (
+        <span className="text-sm sm:text-base font-bold text-foreground tracking-tight truncate">{stage.name}</span>
+      )}
+
+      <div className="flex items-center gap-2 ml-auto">
+        {!isEditing && (
+          <div className="flex items-center gap-2 bg-background/40 px-2 py-1 rounded-lg border border-border">
+            <div className="h-3 w-3 rounded-full shadow-[0_0_8px_currentColor]" style={{ backgroundColor: stage.color, color: stage.color }} />
+            <span className="text-[9px] font-mono font-bold text-muted-foreground uppercase">{stage.color}</span>
+          </div>
+        )}
+
+        <div className="flex items-center gap-1">
+          {isEditing ? (
+            <>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="h-8 w-8 text-primary hover:bg-primary/10"
+                onClick={handleUpdate}
+                disabled={isUpdating}
+              >
+                {isUpdating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+              </Button>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="h-8 w-8 text-muted-foreground hover:bg-muted"
+                onClick={() => {
+                  setIsEditing(false);
+                  setName(stage.name);
+                  setColor(stage.color);
+                }}
+                disabled={isUpdating}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </>
+          ) : (
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="h-8 w-8 text-muted-foreground hover:text-primary transition-colors"
+              onClick={() => setIsEditing(true)}
+            >
+              <Pencil className="h-3.5 w-3.5" />
+            </Button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function SettingsPage() {
   const { currentWorkspace } = useWorkspaces();
@@ -134,14 +249,7 @@ export default function SettingsPage() {
             <h2 className="text-[10px] sm:text-[11px] font-black text-primary/80 uppercase tracking-widest mb-6 sm:mb-8">Funil de Vendas</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               {stages.map((stage, i) => (
-                <div key={stage.id} className="flex items-center gap-3 sm:gap-5 py-3 px-4 sm:py-5 sm:px-6 rounded-xl sm:rounded-2xl bg-muted border border-border">
-                  <span className="text-xs sm:text-sm font-black text-primary tabular-nums h-7 w-7 sm:h-8 sm:w-8 rounded-lg sm:rounded-xl bg-primary/10 flex items-center justify-center border border-primary/20">{i + 1}</span>
-                  <span className="text-sm sm:text-base font-bold text-foreground tracking-tight">{stage.name}</span>
-                  <div className="flex items-center gap-2 ml-auto bg-background/40 px-2 py-1 rounded-lg border border-border">
-                    <div className="h-3 w-3 rounded-full" style={{ backgroundColor: stage.color }} />
-                    <span className="text-[9px] font-mono font-bold text-muted-foreground uppercase">{stage.color}</span>
-                  </div>
-                </div>
+                <StageItem key={stage.id} stage={stage} index={i} workspaceId={currentWorkspace?.id} />
               ))}
             </div>
           </Card>

@@ -30,20 +30,32 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { useRequiredFields } from "@/hooks/useSettings";
+import { useRequiredFields, useCustomFields } from "@/hooks/useSettings";
+import { cn } from "@/lib/utils";
 
-function KanbanColumn({ stageId, stageName, leads, children }: { stageId: string; stageName: string; leads: Lead[]; children?: React.ReactNode }) {
+function KanbanColumn({ stageId, stageName, stageColor, leads, children }: { stageId: string; stageName: string; stageColor?: string; leads: Lead[]; children?: React.ReactNode }) {
   const { setNodeRef, isOver } = useDroppable({ id: stageId, data: { stageId, stageName } });
 
   return (
     <div
       ref={setNodeRef}
-      className={`flex flex-col min-w-[280px] w-[280px] shrink-0 rounded-2xl transition-all duration-200 bg-muted/40 border border-border pb-4 ${
-        isOver ? "bg-primary/5 ring-1 ring-primary/20" : ""
-      }`}
+      className={cn(
+        "flex flex-col min-w-[280px] w-[280px] shrink-0 rounded-2xl transition-all duration-200 bg-muted/40 border border-border pb-4 relative overflow-hidden",
+        isOver && "bg-primary/5 ring-1 ring-primary/20"
+      )}
     >
+      {/* Stage Color Indicator Top */}
+      <div 
+        className="absolute top-0 left-0 right-0 h-1 opacity-60" 
+        style={{ backgroundColor: stageColor || "hsl(var(--primary))" }} 
+      />
+
       <div className="flex items-center justify-between px-4 py-4 mb-2 sticky top-0 backdrop-blur-sm z-10 rounded-t-2xl">
         <div className="flex items-center gap-2">
+          <div 
+            className="h-2 w-2 rounded-full shadow-[0_0_8px_currentColor]" 
+            style={{ backgroundColor: stageColor || "hsl(var(--primary))", color: stageColor || "hsl(var(--primary))" }} 
+          />
           <h3 className="text-xs font-bold text-foreground/90 uppercase tracking-wider">{stageName}</h3>
           <span className="text-[10px] font-bold tabular-nums text-primary bg-primary/10 border border-primary/20 px-2 py-0.5 rounded-full">
             {leads.length}
@@ -194,7 +206,15 @@ function LeadsTableView({ leads, onDelete, onEdit }: { leads: Lead[]; onDelete: 
                     </div>
                   </td>
                   <td className="p-5">
-                    <Badge variant="outline" className="text-[9px] font-black uppercase tracking-widest px-2.5 py-0.5 border-primary/20 bg-primary/5 text-primary">
+                    <Badge 
+                      variant="outline" 
+                      className="text-[9px] font-black uppercase tracking-widest px-2.5 py-0.5 border-transparent"
+                      style={{ 
+                        backgroundColor: `${lead.stage_color || 'hsl(var(--primary))'}15`, 
+                        color: lead.stage_color || 'hsl(var(--primary))',
+                        border: `1px solid ${lead.stage_color || 'hsl(var(--primary))'}30`
+                      }}
+                    >
                       {lead.stage_name}
                     </Badge>
                   </td>
@@ -281,7 +301,15 @@ function LeadsListView({ leads, onDelete, onEdit }: { leads: Lead[]; onDelete: (
             <div className="flex items-center justify-between pt-4 border-t border-border relative z-10">
               <div className="flex flex-col gap-1">
                 <span className="text-[9px] text-muted-foreground uppercase font-black tracking-widest">Etapa Atual</span>
-                <Badge variant="outline" className="text-[10px] font-black uppercase tracking-widest border-primary/20 bg-primary/5 text-primary w-fit px-2">
+                <Badge 
+                  variant="outline" 
+                  className="text-[10px] font-black uppercase tracking-widest border-transparent w-fit px-2"
+                  style={{ 
+                    backgroundColor: `${lead.stage_color || 'hsl(var(--primary))'}15`, 
+                    color: lead.stage_color || 'hsl(var(--primary))',
+                    border: `1px solid ${lead.stage_color || 'hsl(var(--primary))'}30`
+                  }}
+                >
                   {lead.stage_name}
                 </Badge>
               </div>
@@ -327,6 +355,7 @@ export default function LeadsPage() {
   const { data: stages = [] } = useFunnelStages(currentWorkspace?.id);
   const { data: requiredFields = [] } = useRequiredFields(currentWorkspace?.id);
   const { data: campaigns = [] } = useCampaigns(currentWorkspace?.id);
+  const { data: customFields = [] } = useCustomFields(currentWorkspace?.id);
   
   const [viewMode, setViewMode] = useState<ViewMode>(isMobile ? "list" : "kanban");
   const [search, setSearch] = useState("");
@@ -340,8 +369,9 @@ export default function LeadsPage() {
   const { data: members = [] } = useWorkspaceMembers(currentWorkspace?.id);
   const navigate = useNavigate();
 
-  const [newLead, setNewLead] = useState({
+  const [newLead, setNewLead] = useState<any>({
     name: "", email: "", phone: "", company: "", role: "", origin: "LinkedIn", notes: "",
+    custom_data: {}
   });
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
@@ -435,7 +465,7 @@ export default function LeadsPage() {
           role: newLead.role,
           origin: newLead.origin,
           notes: newLead.notes,
-          custom_data: {},
+          custom_data: newLead.custom_data || {},
         });
         
         if (baseStage?.id && createdLead) {
@@ -449,7 +479,7 @@ export default function LeadsPage() {
         }
       }
       
-      setNewLead({ name: "", email: "", phone: "", company: "", role: "", origin: "LinkedIn", notes: "" });
+      setNewLead({ name: "", email: "", phone: "", company: "", role: "", origin: "LinkedIn", notes: "", custom_data: {} });
       setEditingLeadId(null);
       setSheetOpen(false);
     } finally {
@@ -483,6 +513,7 @@ export default function LeadsPage() {
       role: lead.role || "",
       origin: lead.origin || "LinkedIn",
       notes: lead.notes || "",
+      custom_data: lead.custom_data || {},
     });
     setSheetOpen(true);
   };
@@ -558,7 +589,7 @@ export default function LeadsPage() {
             setSheetOpen(o);
             if (!o) {
               setEditingLeadId(null);
-              setNewLead({ name: "", email: "", phone: "", company: "", role: "", origin: "LinkedIn", notes: "" });
+              setNewLead({ name: "", email: "", phone: "", company: "", role: "", origin: "LinkedIn", notes: "", custom_data: {} });
             }
           }}>
             <SheetTrigger asChild>
@@ -574,23 +605,97 @@ export default function LeadsPage() {
               </SheetHeader>
               <div className="space-y-4 mt-8">
                 <div className="grid grid-cols-1 gap-4">
-                  {(["name", "email", "phone", "company", "role"] as const).map((field) => (
+                  {(["name", "email", "company"] as const).map((field) => (
                     <div key={field} className="space-y-1.5">
                       <Label className="text-[11px] uppercase tracking-widest font-bold text-muted-foreground ml-1">
                         {field === "name" ? "Nome Completo" : 
-                         field === "email" ? "E-mail" : 
-                         field === "phone" ? "Telefone" : 
-                         field === "company" ? "Empresa" : "Cargo"}
+                         field === "email" ? "E-mail" : "Empresa"}
                       </Label>
                       <Input
                         value={newLead[field]}
                         onChange={(e) => setNewLead({ ...newLead, [field]: e.target.value })}
                         className="bg-muted/30 border-border h-12 rounded-xl focus:ring-primary/20"
-                        placeholder={`Digite o ${field}...`}
+                        placeholder={`Digite o ${field === "name" ? "nome" : field === "email" ? "e-mail" : "nome da empresa"}...`}
                       />
                     </div>
                   ))}
+
+                  <div className="space-y-1.5">
+                    <Label className="text-[11px] uppercase tracking-widest font-bold text-muted-foreground ml-1">Telefone</Label>
+                    <Input
+                      value={newLead.phone}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/\D/g, "");
+                        let formatted = val;
+                        if (val.length > 0) {
+                          formatted = "(" + val.substring(0, 2);
+                          if (val.length > 2) {
+                            formatted += ") " + val.substring(2, 7);
+                            if (val.length > 7) {
+                              formatted += "-" + val.substring(7, 11);
+                            }
+                          }
+                        }
+                        setNewLead({ ...newLead, phone: formatted.substring(0, 15) });
+                      }}
+                      className="bg-muted/30 border-border h-12 rounded-xl focus:ring-primary/20"
+                      placeholder="(00) 00000-0000"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label className="text-[11px] uppercase tracking-widest font-bold text-muted-foreground ml-1">Cargo</Label>
+                    <Select value={newLead.role} onValueChange={(v) => setNewLead({ ...newLead, role: v })}>
+                      <SelectTrigger className="bg-muted/30 border-border h-12 rounded-xl">
+                        <SelectValue placeholder="Selecione o cargo..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {["Proprietário", "Sócio", "Diretor", "Gerente de Vendas", "Gerente de Marketing", "SDR", "BDR", "Vendedor", "Outro"].map((r) => (
+                          <SelectItem key={r} value={r}>{r}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Dinamic Custom Fields */}
+                  {customFields.map((field: any) => (
+                    <div key={field.id} className="space-y-1.5">
+                      <Label className="text-[11px] uppercase tracking-widest font-bold text-muted-foreground ml-1">
+                        {field.name}
+                      </Label>
+                      {field.field_type === "select" ? (
+                        <Select 
+                          value={newLead.custom_data?.[field.field_key] || ""} 
+                          onValueChange={(v) => setNewLead({ 
+                            ...newLead, 
+                            custom_data: { ...newLead.custom_data, [field.field_key]: v } 
+                          })}
+                        >
+                          <SelectTrigger className="bg-muted/30 border-border h-12 rounded-xl">
+                            <SelectValue placeholder={`Selecione ${field.name}...`} />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {field.options?.map((opt: string) => (
+                              <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <Input
+                          type={field.field_type === "number" ? "number" : "text"}
+                          value={newLead.custom_data?.[field.field_key] || ""}
+                          onChange={(e) => setNewLead({ 
+                            ...newLead, 
+                            custom_data: { ...newLead.custom_data, [field.field_key]: e.target.value } 
+                          })}
+                          className="bg-muted/30 border-border h-12 rounded-xl focus:ring-primary/20"
+                          placeholder={`Digite ${field.name}...`}
+                        />
+                      )}
+                    </div>
+                  ))}
                 </div>
+
                 <div className="space-y-1.5">
                   <Label className="text-[11px] uppercase tracking-widest font-bold text-muted-foreground ml-1">Origem</Label>
                   <Select value={newLead.origin} onValueChange={(v) => setNewLead({ ...newLead, origin: v })}>
@@ -632,7 +737,7 @@ export default function LeadsPage() {
                 const stageLeads = filteredLeads.filter((l) => l.stage_id === stage.id);
                 return (
                   <div key={stage.id} className="snap-center lg:snap-align-none shrink-0 w-[85vw] sm:w-[320px] lg:w-[280px]">
-                    <KanbanColumn stageId={stage.id} stageName={stage.name} leads={stageLeads}>
+                    <KanbanColumn stageId={stage.id} stageName={stage.name} stageColor={stage.color} leads={stageLeads}>
                       <div className="space-y-3">
                         {stageLeads.map((lead) => (
                           <DraggableLeadCard key={lead.id} lead={lead} onDelete={openDeleteModal} onEdit={openEditSheet} />

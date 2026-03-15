@@ -3,6 +3,7 @@ import { AppSidebar } from "@/components/AppSidebar";
 import { useState, useEffect } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
+import { PendingInviteBanner } from "@/components/PendingInviteBanner";
 
 export default function AppLayout() {
   const isMobile = useIsMobile();
@@ -20,8 +21,8 @@ export default function AppLayout() {
     <div className="flex h-screen w-full overflow-hidden bg-background transition-colors duration-300">
       {isMobile ? (
         <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
-          <SheetContent side="left" className="p-0 border-none w-72 bg-background">
-            <AppSidebar collapsed={false} onSelect={() => setMobileOpen(false)} />
+          <SheetContent side="left" className="p-0 border-none w-64 bg-background" hideClose>
+            <AppSidebar collapsed={false} isMobile={true} onSelect={() => setMobileOpen(false)} />
           </SheetContent>
         </Sheet>
       ) : (
@@ -29,6 +30,7 @@ export default function AppLayout() {
       )}
       
       <main className="flex-1 overflow-auto relative">
+        <PendingInviteBanner />
         <Outlet context={{ 
           collapsed, 
           setCollapsed, 

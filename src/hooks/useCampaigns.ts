@@ -10,7 +10,11 @@ export function useLeadDetail(leadId?: string) {
       if (!leadId) return null;
       const { data, error } = await supabase
         .from("leads")
-        .select("*, funnel_stages(id, name)")
+        .select(`
+          *,
+          funnel_stages(id, name),
+          assigned_to_profile:assigned_to(id, full_name, email)
+        `)
         .eq("id", leadId)
         .single();
 
