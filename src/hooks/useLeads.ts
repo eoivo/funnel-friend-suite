@@ -18,6 +18,10 @@ export interface Lead {
   created_at: string;
   updated_at: string;
   stage_name?: string;
+  profiles?: {
+    full_name: string | null;
+    email: string | null;
+  };
 }
 
 export function useLeads(workspaceId?: string) {
@@ -29,7 +33,7 @@ export function useLeads(workspaceId?: string) {
       if (!workspaceId) return [];
       const { data, error } = await supabase
         .from("leads")
-        .select("*, funnel_stages(id, name)")
+        .select("*, funnel_stages(id, name), profiles(full_name, email)")
         .eq("workspace_id", workspaceId)
         .order("created_at", { ascending: false });
 
@@ -70,10 +74,10 @@ export function useLeads(workspaceId?: string) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["leads"] });
       queryClient.invalidateQueries({ queryKey: ["activities"] });
-      toast.success("Lead created successfully");
+      toast.success("Lead criado com sucesso!");
     },
     onError: (error: any) => {
-      toast.error(error.message || "Failed to create lead");
+      toast.error(error.message || "Falha ao criar lead");
     }
   });
 
@@ -83,7 +87,7 @@ export function useLeads(workspaceId?: string) {
         .from("leads")
         .update({ stage_id: stageId })
         .eq("id", leadId)
-        .select("*, funnel_stages(name)")
+        .select("*, funnel_stages(name), profiles(full_name, email)")
         .single();
 
       if (leadError) throw leadError;
@@ -106,10 +110,10 @@ export function useLeads(workspaceId?: string) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["leads"] });
       queryClient.invalidateQueries({ queryKey: ["activities"] });
-      toast.success("Lead stage updated");
+      toast.success("Etapa do lead atualizada!");
     },
     onError: (error: any) => {
-      toast.error(error.message || "Failed to update stage");
+      toast.error(error.message || "Falha ao atualizar etapa");
     }
   });
 
@@ -119,7 +123,7 @@ export function useLeads(workspaceId?: string) {
         .from("leads")
         .update({ assigned_to: userId })
         .eq("id", leadId)
-        .select("*, profiles:assigned_to(full_name, email)")
+        .select("*, profiles(full_name, email)")
         .single();
 
       if (leadError) throw leadError;
@@ -134,7 +138,7 @@ export function useLeads(workspaceId?: string) {
           action: "assignment_updated",
           metadata: { 
             lead_name: lead.name, 
-            assigned_to_name: lead.profiles?.full_name || lead.profiles?.email || "Unassigned"
+            assigned_to_name: lead.profiles?.full_name || lead.profiles?.email || "Ninguém"
           }
         });
       }
@@ -142,10 +146,73 @@ export function useLeads(workspaceId?: string) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["leads"] });
       queryClient.invalidateQueries({ queryKey: ["activities"] });
-      toast.success("Lead assignment updated");
+      toast.success("Responsável atualizado!");
     },
     onError: (error: any) => {
-      toast.error(error.message || "Failed to update assignment");
+      toast.error(error.message || "Falha ao atualizar responsável");
+    }
+  });
+
+  const deleteLeadMutation = useMutation({
+    mutationFn: async (leadId: string) => {
+      // Get lead info before deletion for logging
+      const { data: lead } = await supabase
+        .from("leads")
+        .select("name")
+        .eq("id", leadId)
+        .single();
+
+      const { error } = await supabase
+        .from("leads")
+        .delete()
+        .eq("id", leadId);
+
+      if (error) throw error;
+
+      // Log activity
+      const { data: userData } = await supabase.auth.getUser();
+      if (userData.user && lead) {
+        await supabase.from("activity_logs").insert({
+          workspace_id: workspaceId,
+          user_id: userData.user.id,
+          action: "lead_deleted",
+          metadata: { lead_name: lead.name }
+        });
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["leads"] });
+      queryClient.invalidateQueries({ queryKey: ["activities"] });
+      toast.success("Lead excluído com sucesso");
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Falha ao excluir lead");
+    }
+  });
+
+  const updateLeadMutation = useMutation({
+    mutationFn: async ({ leadId, updates }: { leadId: string; updates: Partial<Lead> }) => {
+      const { data, error } = await supabase
+        .from("leads")
+        .update(updates)
+        .eq("id", leadId)
+        .select(`
+          *,
+          funnel_stages(id, name),
+          profiles(full_name, email)
+        `)
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["leads"] });
+      queryClient.invalidateQueries({ queryKey: ["lead"] });
+      toast.success("Lead atualizado com sucesso");
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Falha ao atualizar lead");
     }
   });
 
@@ -154,8 +221,10 @@ export function useLeads(workspaceId?: string) {
     isLoading,
     error,
     createLead: createLeadMutation.mutateAsync,
+    updateLead: updateLeadMutation.mutateAsync,
     updateStage: updateStageMutation.mutateAsync,
     updateAssignment: updateAssignmentMutation.mutateAsync,
+    deleteLead: deleteLeadMutation.mutateAsync,
   };
 }
 

@@ -4,6 +4,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import { ThemeProvider } from "@/contexts/ThemeContext";
 import AppLayout from "@/components/AppLayout";
 import LoginPage from "@/pages/Login";
 import RegisterPage from "@/pages/Register";
@@ -50,7 +51,8 @@ function AuthRoute({ children }: { children: React.ReactNode }) {
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
+    <ThemeProvider>
+      <TooltipProvider>
       <Toaster />
       <Sonner />
       <AuthProvider>
@@ -73,6 +75,7 @@ const App = () => (
         </BrowserRouter>
       </AuthProvider>
     </TooltipProvider>
+    </ThemeProvider>
   </QueryClientProvider>
 );
 

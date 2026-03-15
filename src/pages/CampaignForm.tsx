@@ -12,6 +12,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
+import { PageHeader } from "@/components/PageHeader";
+
 export default function CampaignFormPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -46,7 +48,7 @@ export default function CampaignFormPage() {
   const handleSave = async () => {
     if (!currentWorkspace) return;
     if (!form.name.trim()) {
-      toast.error("Campaign name is required");
+      toast.error("O nome da campanha é obrigatório");
       return;
     }
     
@@ -64,17 +66,19 @@ export default function CampaignFormPage() {
           id, 
           updates: payload 
         });
+        toast.success("Campanha atualizada!");
       } else {
         await createCampaign.mutateAsync({
           workspace_id: currentWorkspace.id,
           ...payload,
           is_active: true
         });
+        toast.success("Campanha criada!");
       }
       navigate("/campaigns");
     } catch (error: any) {
       console.error(error);
-      toast.error(error.message || "Failed to save campaign");
+      toast.error(error.message || "Falha ao salvar campanha");
     } finally {
       setIsSaving(false);
     }
@@ -89,69 +93,81 @@ export default function CampaignFormPage() {
   }
 
   return (
-    <div className="p-6 mx-auto animate-slide-up max-w-2xl">
-      <Button variant="ghost" onClick={() => navigate("/campaigns")} className="mb-4 gap-1.5 text-muted-foreground hover:text-foreground -ml-2">
-        <ArrowLeft className="h-4 w-4" /> Back to Campaigns
-      </Button>
+    <div className="flex flex-col h-full animate-fade-in">
+      <PageHeader 
+        title={isEdit ? "Editar Campanha" : "Nova Campanha"} 
+        description="Configure como a IA deve gerar mensagens personalizadas para seus leads."
+      >
+        <Button variant="ghost" onClick={() => navigate("/campaigns")} className="gap-2 text-muted-foreground hover:text-foreground">
+          <ArrowLeft className="h-4 w-4" /> Voltar
+        </Button>
+      </PageHeader>      <div className="p-4 sm:p-8 max-w-4xl w-full mx-auto">
+        <Card className="p-4 sm:p-8 glass-card border-border shadow-sdr-sm">
+          <div className="space-y-4 sm:space-y-6">
+            <div className="space-y-1.5 sm:space-y-2">
+              <Label className="text-[10px] sm:text-[11px] uppercase tracking-widest font-bold text-muted-foreground ml-1">Nome da Campanha</Label>
+              <Input 
+                value={form.name} 
+                onChange={(e) => setForm({ ...form, name: e.target.value })} 
+                className="bg-muted/80 border-border h-10 sm:h-12 rounded-xl focus:ring-primary/20 transition-all font-medium text-sm" 
+                placeholder="Ex: Cold Outreach" 
+              />
+            </div>
+            
+            <div className="space-y-1.5 sm:space-y-2">
+              <Label className="text-[10px] sm:text-[11px] uppercase tracking-widest font-bold text-muted-foreground ml-1">Contexto</Label>
+              <Textarea 
+                value={form.context} 
+                onChange={(e) => setForm({ ...form, context: e.target.value })} 
+                className="bg-muted/80 border-border min-h-[80px] sm:min-h-[100px] rounded-xl focus:ring-primary/20 transition-all text-sm" 
+                placeholder="Descreva o público-alvo..." 
+              />
+            </div>
 
-      <Card className="p-6 bg-card border-border shadow-sdr-sm">
-        <h1 className="text-lg font-medium text-foreground mb-6">
-          {isEdit ? "Edit Campaign" : "New Campaign"}
-        </h1>
-        <div className="space-y-5">
-          <div className="space-y-1.5">
-            <Label>Campaign Name</Label>
-            <Input 
-              value={form.name} 
-              onChange={(e) => setForm({ ...form, name: e.target.value })} 
-              className="bg-muted border-border" 
-              placeholder="e.g., Cold Outreach — SaaS Leaders" 
-            />
+            <div className="space-y-1.5 sm:space-y-2">
+              <Label className="text-[10px] sm:text-[11px] uppercase tracking-widest font-bold text-muted-foreground ml-1">Prompt da IA</Label>
+              <Textarea 
+                value={form.generation_prompt} 
+                onChange={(e) => setForm({ ...form, generation_prompt: e.target.value })} 
+                className="bg-muted/80 border-border min-h-[120px] sm:min-h-[140px] rounded-xl focus:ring-primary/20 transition-all font-mono text-xs sm:text-sm leading-relaxed" 
+                placeholder="Como a IA deve se comportar..." 
+              />
+              <div className="flex items-center gap-2 mt-1 sm:mt-2 ml-1">
+                <div className="h-1 w-1 rounded-full bg-primary" />
+                <p className="text-[9px] sm:text-[10px] text-muted-foreground uppercase tracking-tight font-bold">Variáveis: {"{{name}}"}, {"{{company}}"}</p>
+              </div>
+            </div>
+
+            <div className="space-y-1.5 sm:space-y-2 border-t border-border pt-4 sm:pt-6">
+              <Label className="text-[10px] sm:text-[11px] uppercase tracking-widest font-bold text-muted-foreground ml-1">Gatilho (Opcional)</Label>
+              <Select value={form.trigger_stage_id} onValueChange={(v) => setForm({ ...form, trigger_stage_id: v })}>
+                <SelectTrigger className="bg-muted/80 border-border h-10 sm:h-12 rounded-xl font-bold text-sm">
+                  <SelectValue placeholder="Selecione uma etapa..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="_no_trigger">Sem gatilho automático</SelectItem>
+                  {stages.map((s) => (
+                    <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 pt-4">
+              <Button 
+                onClick={handleSave} 
+                disabled={isSaving}
+                className="flex-1 bg-primary text-black font-black hover:bg-primary/95 h-12 sm:h-14 rounded-xl sm:rounded-2xl shadow-glow transition-all active:scale-[0.98]"
+              >
+                {isSaving ? <Loader2 className="h-5 w-5 animate-spin" /> : (isEdit ? "Salvar Alterações" : "Criar Campanha")}
+              </Button>
+              <Button variant="outline" onClick={() => navigate("/campaigns")} className="h-12 sm:h-14 px-8 rounded-xl sm:rounded-2xl border-border font-bold">
+                Cancelar
+              </Button>
+            </div>
           </div>
-          <div className="space-y-1.5">
-            <Label>Context / Description</Label>
-            <Textarea 
-              value={form.context} 
-              onChange={(e) => setForm({ ...form, context: e.target.value })} 
-              className="bg-muted border-border min-h-[100px]" 
-              placeholder="Describe the target audience and goals..." 
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label>Generation Prompt Template</Label>
-            <Textarea 
-              value={form.generation_prompt} 
-              onChange={(e) => setForm({ ...form, generation_prompt: e.target.value })} 
-              className="bg-muted border-border min-h-[120px]" 
-              placeholder="Write a prompt template. Use {{name}}, {{company}}, {{role}} as placeholders." 
-            />
-            <p className="text-[10px] text-muted-foreground italic">Tip: The AI works best when you define the tone (e.g., 'professional but friendly').</p>
-          </div>
-          <div className="space-y-1.5">
-            <Label>Trigger Stage (Optional)</Label>
-            <Select value={form.trigger_stage_id} onValueChange={(v) => setForm({ ...form, trigger_stage_id: v })}>
-              <SelectTrigger className="bg-muted border-border text-sm">
-                <SelectValue placeholder="Select a stage..." />
-              </SelectTrigger>
-              <SelectContent>
-                {stages.map((s) => (
-                  <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="flex gap-3 pt-2">
-            <Button 
-              onClick={handleSave} 
-              disabled={isSaving}
-              className="bg-primary text-primary-foreground hover:bg-primary/90 min-w-[120px]"
-            >
-              {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : (isEdit ? "Save Changes" : "Create Campaign")}
-            </Button>
-            <Button variant="secondary" onClick={() => navigate("/campaigns")}>Cancel</Button>
-          </div>
-        </div>
-      </Card>
+        </Card>
+      </div>
     </div>
   );
 }

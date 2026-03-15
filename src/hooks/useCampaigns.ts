@@ -81,5 +81,35 @@ export function useCampaignMutation(workspaceId?: string) {
     },
   });
 
-  return { createCampaign, updateCampaign };
+  const deleteCampaign = useMutation({
+    mutationFn: async (id: string) => {
+      // Check if campaign has leads (messages)
+      const { count, error: checkError } = await supabase
+        .from("generated_messages")
+        .select("*", { count: 'exact', head: true })
+        .eq("campaign_id", id);
+
+      if (checkError) throw checkError;
+      
+      if (count && count > 0) {
+        throw new Error(`Esta campanha possui ${count} lead(s) associados. Remova os leads ou as mensagens geradas antes de excluir a campanha.`);
+      }
+
+      const { error } = await supabase
+        .from("campaigns")
+        .delete()
+        .eq("id", id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["campaigns", workspaceId] });
+      toast.success("Campanha excluída com sucesso!");
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Falha ao excluir campanha");
+    }
+  });
+
+  return { createCampaign, updateCampaign, deleteCampaign };
 }
