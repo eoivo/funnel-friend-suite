@@ -31,7 +31,7 @@ export function useCustomFields(workspaceId?: string) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["custom_fields", workspaceId] });
-      toast.success("Field added");
+      toast.success("Campo adicionado com sucesso!");
     }
   });
 
@@ -45,7 +45,7 @@ export function useCustomFields(workspaceId?: string) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["custom_fields", workspaceId] });
-      toast.success("Field removed");
+      toast.success("Campo excluído com sucesso!");
     }
   });
 

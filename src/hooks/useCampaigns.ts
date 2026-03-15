@@ -60,7 +60,7 @@ export function useCampaignMutation(workspaceId?: string) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["campaigns", workspaceId] });
-      toast.success("Campaign created");
+      toast.success("Campanha criada com sucesso!");
     },
   });
 
@@ -77,7 +77,7 @@ export function useCampaignMutation(workspaceId?: string) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["campaigns", workspaceId] });
-      toast.success("Campaign updated");
+      toast.success("Campanha atualizada com sucesso!");
     },
   });
 

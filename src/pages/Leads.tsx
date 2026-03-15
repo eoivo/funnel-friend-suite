@@ -405,7 +405,7 @@ export default function LeadsPage() {
 
     const triggerCampaigns = campaigns.filter(c => c.trigger_stage_id === destinationStageId);
     if (triggerCampaigns.length > 0) {
-      toast.info(`Automating AI messages for ${activeLead.name}...`);
+      toast.info(`Automatizando as mensagens com IA para ${activeLead.name}...`);
       for (const campaign of triggerCampaigns) {
         generateSDRMessages(activeLead, campaign).catch(console.error);
       }
@@ -441,7 +441,7 @@ export default function LeadsPage() {
         if (baseStage?.id && createdLead) {
           const triggerCampaigns = campaigns.filter(c => c.trigger_stage_id === baseStage.id);
           if (triggerCampaigns.length > 0) {
-            toast.info(`Automating AI messages for ${createdLead.name}...`);
+            toast.info(`Automatizando as mensagens com IA para ${createdLead.name}...`);
             for (const campaign of triggerCampaigns) {
                generateSDRMessages(createdLead, campaign).catch(console.error);
             }

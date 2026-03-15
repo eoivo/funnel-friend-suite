@@ -8,6 +8,8 @@ import { ThemeProvider } from "@/contexts/ThemeContext";
 import AppLayout from "@/components/AppLayout";
 import LoginPage from "@/pages/Login";
 import RegisterPage from "@/pages/Register";
+import ForgotPasswordPage from "@/pages/ForgotPassword";
+import ResetPasswordPage from "@/pages/ResetPassword";
 import DashboardPage from "@/pages/Dashboard";
 import LeadsPage from "@/pages/Leads";
 import LeadDetailPage from "@/pages/LeadDetail";
@@ -61,6 +63,8 @@ const App = () => (
             <Route path="/" element={<Navigate to="/login" replace />} />
             <Route path="/login" element={<AuthRoute><LoginPage /></AuthRoute>} />
             <Route path="/register" element={<AuthRoute><RegisterPage /></AuthRoute>} />
+            <Route path="/forgot-password" element={<AuthRoute><ForgotPasswordPage /></AuthRoute>} />
+            <Route path="/reset-password" element={<AuthRoute><ResetPasswordPage /></AuthRoute>} />
             <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
               <Route path="/dashboard" element={<DashboardPage />} />
               <Route path="/leads" element={<LeadsPage />} />

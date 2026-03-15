@@ -4,13 +4,15 @@ import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Zap, Loader2 } from "lucide-react";
+import { Zap, Loader2, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
+import { translateAuthError } from "@/utils/errors";
 import heroBg from "@/assets/hero-bg.jpg.jpg";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
@@ -26,10 +28,10 @@ export default function LoginPage() {
 
       if (error) throw error;
       
-      toast.success("Welcome back!");
+      toast.success("Bem-vindo de volta!");
       navigate("/dashboard");
     } catch (error: any) {
-      toast.error(error.message || "Failed to sign in");
+      toast.error(translateAuthError(error));
     } finally {
       setLoading(false);
     }
@@ -119,17 +121,26 @@ export default function LoginPage() {
             <div className="space-y-3">
               <div className="flex items-center justify-between ml-1">
                 <Label htmlFor="password" className="text-[11px] text-muted-foreground uppercase font-bold tracking-[0.2em]">Senha de Acesso</Label>
-                <a href="#" className="text-[10px] text-primary/60 hover:text-primary transition-colors font-bold uppercase tracking-widest">Esqueceu a senha?</a>
+                <Link to="/forgot-password" className="text-[10px] text-primary/60 hover:text-primary transition-colors font-bold uppercase tracking-widest">Esqueceu a senha?</Link>
               </div>
-              <Input 
-                id="password" 
-                type="password" 
-                required
-                value={password} 
-                onChange={(e) => setPassword(e.target.value)} 
-                placeholder="••••••••"
-                className="bg-muted border-border h-14 rounded-2xl focus:ring-primary/20 text-foreground placeholder:text-muted-foreground/50 transition-all font-medium text-base px-6"
-              />
+              <div className="relative">
+                <Input 
+                  id="password" 
+                  type={showPassword ? "text" : "password"} 
+                  required
+                  value={password} 
+                  onChange={(e) => setPassword(e.target.value)} 
+                  placeholder="••••••••"
+                  className="bg-muted border-border h-14 rounded-2xl focus:ring-primary/20 text-foreground placeholder:text-muted-foreground/50 transition-all font-medium text-base px-6 pr-12"
+                />
+                <button 
+                  type="button" 
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                </button>
+              </div>
             </div>
             
             <Button 

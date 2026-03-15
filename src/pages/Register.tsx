@@ -4,8 +4,9 @@ import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Zap, Loader2 } from "lucide-react";
+import { Zap, Loader2, ArrowLeft, Eye, EyeOff, Check } from "lucide-react";
 import { toast } from "sonner";
+import { translateAuthError } from "@/utils/errors";
 import heroBg from "@/assets/hero-bg.jpg.jpg";
 
 export default function RegisterPage() {
@@ -13,11 +14,21 @@ export default function RegisterPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [workspaceName, setWorkspaceName] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  
+  const hasMinLength = password.length >= 8;
+  const hasUpperCase = /[A-Z]/.test(password);
+  const hasSpecialChar = /[^A-Za-z0-9]/.test(password);
+  const isPasswordSecure = hasMinLength && hasUpperCase && hasSpecialChar;
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isPasswordSecure) {
+      toast.error("Por favor, crie uma senha que atenda aos requisitos de segurança.");
+      return;
+    }
     setLoading(true);
 
     try {
@@ -63,11 +74,11 @@ export default function RegisterPage() {
 
       if (rpcError) throw rpcError;
       
-      toast.success("Workspace created! Please check your email and sign in.");
+      toast.success("Workspace criado! Por favor, verifique seu e-mail e faça login.");
       navigate("/login");
       
     } catch (error: any) {
-      toast.error(error.message || "Failed to create account");
+      toast.error(translateAuthError(error));
       console.error(error);
     } finally {
       setLoading(false);
@@ -136,6 +147,13 @@ export default function RegisterPage() {
 
       {/* Right Side: Registration Form */}
       <div className="flex-1 bg-background p-8 lg:p-20 flex flex-col justify-center relative border-t lg:border-t-0 lg:border-l border-border overflow-y-auto">
+        {/* Back Button */}
+        <div className="absolute top-6 right-6 sm:top-8 sm:right-8 lg:top-10 lg:right-10 z-20">
+          <Link to="/login" className="flex items-center gap-2 text-[10px] sm:text-xs font-bold uppercase tracking-widest text-muted-foreground hover:text-foreground transition-colors bg-muted/50 hover:bg-muted px-3 py-1.5 sm:px-4 sm:py-2.5 rounded-xl border border-border">
+            <ArrowLeft className="h-4 w-4" /> Voltar
+          </Link>
+        </div>
+
         <div className="max-w-md mx-auto w-full animate-fade-in py-8 lg:py-0">
           <div className="mb-8 lg:mb-10">
             <h3 className="font-['Syne'] font-bold text-3xl lg:text-4xl text-foreground mb-3 tracking-tight">Criar Conta</h3>
@@ -179,15 +197,39 @@ export default function RegisterPage() {
             </div>
             <div className="space-y-2 lg:space-y-3">
               <Label htmlFor="password" className="text-[11px] text-muted-foreground uppercase font-bold tracking-[0.2em] ml-1">Senha de Acesso</Label>
-              <Input 
-                id="password" 
-                type="password" 
-                required 
-                value={password} 
-                onChange={(e) => setPassword(e.target.value)} 
-                placeholder="••••••••"
-                className="bg-muted border-border h-12 rounded-xl focus:ring-primary/20 text-foreground placeholder:text-muted-foreground/50 transition-all font-medium px-5"
-              />
+              <div className="relative">
+                <Input 
+                  id="password" 
+                  type={showPassword ? "text" : "password"} 
+                  required 
+                  value={password} 
+                  onChange={(e) => setPassword(e.target.value)} 
+                  placeholder="••••••••"
+                  className="bg-muted border-border h-12 rounded-xl focus:ring-primary/20 text-foreground placeholder:text-muted-foreground/50 transition-all font-medium px-5 pr-12"
+                />
+                <button 
+                  type="button" 
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                </button>
+              </div>
+
+              <div className="pt-2 space-y-2">
+                <div className="flex items-center gap-2 text-xs font-medium">
+                  {hasMinLength ? <Check className="h-3 w-3 text-primary" /> : <div className="w-1.5 h-1.5 rounded-full bg-muted-foreground/30 ml-0.5" />}
+                  <span className={hasMinLength ? "text-primary font-bold" : "text-muted-foreground"}>Mínimo de 8 caracteres</span>
+                </div>
+                <div className="flex items-center gap-2 text-xs font-medium">
+                  {hasUpperCase ? <Check className="h-3 w-3 text-primary" /> : <div className="w-1.5 h-1.5 rounded-full bg-muted-foreground/30 ml-0.5" />}
+                  <span className={hasUpperCase ? "text-primary font-bold" : "text-muted-foreground"}>1 letra maiúscula</span>
+                </div>
+                <div className="flex items-center gap-2 text-xs font-medium">
+                  {hasSpecialChar ? <Check className="h-3 w-3 text-primary" /> : <div className="w-1.5 h-1.5 rounded-full bg-muted-foreground/30 ml-0.5" />}
+                  <span className={hasSpecialChar ? "text-primary font-bold" : "text-muted-foreground"}>1 caractere especial (!@#$%)</span>
+                </div>
+              </div>
             </div>
             
             <Button 
