@@ -63,8 +63,19 @@ export default function AcceptInvite() {
     setLoading(true);
 
     try {
-      const { error } = await supabase.auth.updateUser({ password });
-      if (error) throw error;
+      const { error: updateAuthError } = await supabase.auth.updateUser({ password });
+      if (updateAuthError) throw updateAuthError;
+
+      // Automatically activate the pending membership for this user
+      // Since they just created their password via invite, they should be active in their workspace
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        await supabase
+          .from('workspace_members')
+          .update({ status: 'active' })
+          .eq('user_id', user.id)
+          .eq('status', 'pending');
+      }
       
       // Logout to ensure clean state and show login message
       await supabase.auth.signOut();

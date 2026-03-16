@@ -73,7 +73,8 @@ Deno.serve(async (req) => {
       .insert({
         workspace_id: workspaceId,
         user_id: inviteData.user.id,
-        role: role || 'member'
+        role: role || 'member',
+        status: 'pending'
       })
 
     if (memberError && memberError.code !== '23505') throw memberError

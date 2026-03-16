@@ -48,7 +48,8 @@ Deno.serve(async (req) => {
       .insert({
         workspace_id: workspace.id,
         user_id: user.id,
-        role: 'admin'
+        role: 'admin',
+        status: 'active'
       })
     
     if (memberError) throw memberError
