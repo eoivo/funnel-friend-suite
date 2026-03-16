@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7'
 
 const corsHeaders = {
@@ -12,7 +13,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { email, name, role, workspaceId } = await req.json()
+    const { email, name, role, workspaceId, confirmExisting } = await req.json()
     const authHeader = req.headers.get('Authorization')
     
     if (!authHeader) {
@@ -56,7 +57,56 @@ Deno.serve(async (req) => {
       })
     }
 
-    // 1. Invite User
+    // 1. Check if user already exists globally
+    const { data: { users }, error: listError } = await supabaseAdmin.auth.admin.listUsers()
+    if (listError) throw listError
+    
+    const existingUser = users.find(u => u.email?.toLowerCase() === email.toLowerCase())
+
+    if (existingUser) {
+      // If we haven't confirmed that we want to invite an existing user yet, 
+      // return a signal to the UI to show the confirmation modal.
+      if (!confirmExisting) {
+        return new Response(JSON.stringify({ 
+          needsConfirmation: true,
+          message: `O usuário "${email}" já possui conta no SDR Flow. Deseja enviar um convite para ele participar da sua equipe?`,
+          userName: existingUser.user_metadata?.full_name || name
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200,
+        })
+      }
+
+      // Link to workspace as PENDING
+      const { error: memberError } = await supabaseAdmin
+        .from('workspace_members')
+        .insert({
+          workspace_id: workspaceId,
+          user_id: existingUser.id,
+          role: role || 'member',
+          status: 'pending'
+        })
+
+      if (memberError) {
+        if (memberError.code === '23505') {
+          return new Response(JSON.stringify({ error: 'Este usuário já faz parte deste workspace.' }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 400,
+          })
+        }
+        throw memberError
+      }
+
+      return new Response(JSON.stringify({ 
+        message: 'Convite enviado! O usuário receberá uma notificação para aceitar o acesso à sua equipe.',
+        isExisting: true 
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200,
+      })
+    }
+
+    // 2. New User - Invite
     const { data: inviteData, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(
       email,
       {
@@ -67,7 +117,7 @@ Deno.serve(async (req) => {
 
     if (inviteError) throw inviteError
 
-    // 2. Add as Workspace Member
+    // Add as Workspace Member (PENDING)
     const { error: memberError } = await supabaseAdmin
       .from('workspace_members')
       .insert({
@@ -79,7 +129,10 @@ Deno.serve(async (req) => {
 
     if (memberError && memberError.code !== '23505') throw memberError
 
-    return new Response(JSON.stringify({ message: 'Convite enviado com sucesso!' }), {
+    return new Response(JSON.stringify({ 
+      message: 'Convite enviado com sucesso! O novo membro receberá um e-mail para configurar a senha.',
+      isExisting: false
+    }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
     })
