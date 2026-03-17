@@ -15,7 +15,7 @@ import { useCustomFields } from "@/hooks/useSettings";
 import { useLeadDetail } from "@/hooks/useCampaigns"; // I added it there earlier
 import { useLeads, useFunnelStages } from "@/hooks/useLeads";
 import { useWorkspaces, useWorkspaceMembers } from "@/hooks/useWorkspaces";
-import { useCampaigns, useGeneratedMessages } from "@/hooks/useCampaigns";
+import { useCampaigns, useGeneratedMessages, useMarkAsSent } from "@/hooks/useCampaigns";
 import { generateSDRMessages } from "@/lib/aiService";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -39,7 +39,7 @@ export default function LeadDetailPage() {
   
   const [selectedCampaignId, setSelectedCampaignId] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
-  const [messageToSend, setMessageToSend] = useState<string | null>(null);
+  const [messageToSend, setMessageToSend] = useState<{ text: string; index: number } | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   // Auto-select latest campaign if messages exist
@@ -124,18 +124,32 @@ export default function LeadDetailPage() {
     toast.success("Copiado para a área de transferência");
   };
 
+  const { mutateAsync: markAsSent } = useMarkAsSent(id, leadWorkspaceId);
+
   const handleConfirmSend = async () => {
     if (!messageToSend) return;
     
     try {
       const targetStage = stages.find(s => s.name === "Tentando Contato");
-      if (targetStage) {
+      const currentGeneratedMsg = allMessages.find(m => m.campaign_id === selectedCampaignId);
+
+      if (currentGeneratedMsg) {
+        await markAsSent({
+          messageId: currentGeneratedMsg.id,
+          campaignId: selectedCampaignId,
+          index: messageToSend.index
+        });
+      }
+
+      if (targetStage && lead.stage_id !== targetStage.id) {
         await updateStage({ leadId: lead.id, stageId: targetStage.id });
+      } else {
+        toast.success("Tentativa de contato registrada! Persistência é a chave. 🚀");
       }
       
       setMessageToSend(null);
     } catch (error: any) {
-      toast.error("Falha ao atualizar etapa do lead");
+      toast.error("Falha ao registrar ação");
     }
   };
 
@@ -375,7 +389,7 @@ export default function LeadDetailPage() {
                               <Copy className="h-3.5 w-3.5" /> Copiar
                             </Button>
                             <Button size="sm" className="h-8 text-[10px] sm:text-[11px] gap-2 bg-primary/20 text-primary border border-primary/20 hover:bg-primary/30 font-bold" onClick={() => {
-                              setMessageToSend(msg);
+                              setMessageToSend({ text: msg, index: i });
                             }}>
                               <Send className="h-3.5 w-3.5" /> Usar
                             </Button>
@@ -424,7 +438,7 @@ export default function LeadDetailPage() {
             </DialogDescription>
           </DialogHeader>
           <div className="py-5 px-6 bg-muted border border-border rounded-2xl text-sm mt-4 text-foreground/90 leading-relaxed italic">
-             "{messageToSend}"
+             "{messageToSend?.text}"
           </div>
           <DialogFooter className="mt-8 gap-3">
             <Button variant="ghost" onClick={() => setMessageToSend(null)} className="font-bold">Cancelar</Button>

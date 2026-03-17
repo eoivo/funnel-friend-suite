@@ -135,3 +135,48 @@ export function useGeneratedMessages(leadId?: string) {
     enabled: !!leadId,
   });
 }
+
+export function useMarkAsSent(leadId?: string, workspaceId?: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ messageId, campaignId, index }: { messageId: string; campaignId: string; index: number }) => {
+      const { data, error } = await supabase
+        .from("generated_messages")
+        .update({
+          was_sent: true,
+          sent_at: new Date().toISOString(),
+          sent_message_index: index
+        })
+        .eq("id", messageId)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      // Log activity
+      const { data: userData } = await supabase.auth.getUser();
+      if (userData.user) {
+        await supabase.from("activity_logs").insert({
+          workspace_id: workspaceId,
+          lead_id: leadId,
+          user_id: userData.user.id,
+          action: "message_sent",
+          metadata: { 
+            campaign_id: campaignId,
+            message_index: index
+          }
+        });
+      }
+
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["generated_messages", leadId] });
+      queryClient.invalidateQueries({ queryKey: ["activities", workspaceId] });
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Falha ao registrar envio");
+    }
+  });
+}
