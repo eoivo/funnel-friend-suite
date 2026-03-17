@@ -364,7 +364,7 @@ export default function LeadsPage() {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [editingLeadId, setEditingLeadId] = useState<string | null>(null);
-  const [missingFields, setMissingFields] = useState<{leadName: string, destination: string, fields: string[]} | null>(null);
+  const [missingFields, setMissingFields] = useState<{leadId: string, leadName: string, destination: string, fields: string[]} | null>(null);
   const [leadToDelete, setLeadToDelete] = useState<string | null>(null);
   const { data: members = [] } = useWorkspaceMembers(currentWorkspace?.id);
   const navigate = useNavigate();
@@ -424,6 +424,7 @@ export default function LeadsPage() {
     
     if (missing.length > 0) {
       setMissingFields({
+        leadId: activeLead.id,
         leadName: activeLead.name,
         destination: destinationStageName,
         fields: missing
@@ -783,9 +784,11 @@ export default function LeadsPage() {
           <DialogFooter className="gap-2">
             <Button variant="ghost" className="text-muted-foreground" onClick={() => setMissingFields(null)}>Fechar</Button>
             <Button className="bg-primary text-black font-bold hover:bg-primary/95 shadow-glow" onClick={() => {
-              const id = activeLead?.id;
+              const leadToEdit = leads.find(l => l.id === missingFields?.leadId);
               setMissingFields(null);
-              if (id) navigate(`/leads/${id}`);
+              if (leadToEdit) {
+                openEditSheet({ stopPropagation: () => {} } as any, leadToEdit);
+              }
             }}>Editar Lead</Button>
           </DialogFooter>
         </DialogContent>
