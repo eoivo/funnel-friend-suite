@@ -36,6 +36,7 @@ export default function LeadDetailPage() {
   const { data: campaigns = [] } = useCampaigns(leadWorkspaceId);
   const { data: members = [] } = useWorkspaceMembers(leadWorkspaceId);
   const { data: customFields = [] } = useCustomFields(leadWorkspaceId);
+  const { mutateAsync: markAsSent } = useMarkAsSent(id, leadWorkspaceId);
   
   const [selectedCampaignId, setSelectedCampaignId] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
@@ -124,7 +125,6 @@ export default function LeadDetailPage() {
     toast.success("Copiado para a área de transferência");
   };
 
-  const { mutateAsync: markAsSent } = useMarkAsSent(id, leadWorkspaceId);
 
   const handleConfirmSend = async () => {
     if (!messageToSend) return;
