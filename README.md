@@ -4,17 +4,17 @@ O **Funnel Friend Suite** é uma plataforma de CRM de alta performance voltada p
 
 ## 📌 Links do Projeto
 - **Aplicação Publicada:** [https://funnel-friend-suite.vercel.app/](https://funnel-friend-suite.vercel.app/)
-- **Vídeo de Demonstração:** `[LINK_DO_VIDEO_AQUI]`
+- **Vídeo de Demonstração (Drive):** [Assista aqui](https://drive.google.com/file/d/1ZANdY4yYx9XjlmYA-HDnKjWfwUwrKbmB/view?usp=sharing)
 
 ## 🌟 Funcionalidades de Destaque (Diferenciais)
 
 Além dos requisitos básicos, este sistema implementa:
 
 1. **Arquitetura Multi-Workspace Avançada**: Um usuário pode criar, gerenciar e transitar entre múltiplos workspaces. Os dados são 100% isolados via **Supabase RLS**.
-2. **Gestão de Equipes & Convites via Edge Functions**: Fluxo completo de convite de membros por e-mail, processado nativamente via **Supabase Edge Functions (Deno)**, permitindo colaboração real em tempo real.
-3. **Personalização Total do Funil**: Interface administrativa para trocar nomes e **paletas de cores dinâmicas** das etapas do funil, com reflexo imediato no Kanban e Dashboard.
-4. **Geração Automática (Trigger-based AI)**: Automação que dispara a criação de mensagens personalizadas assim que um lead atinge etapas críticas, economizando tempo precioso do SDR.
-5. **Mobile-First Experience**: Visualização de equipe e leads otimizada para dispositivos móveis com componentes adaptativos e skeletons de carregamento.
+2. **Gestão de Equipes & Convites via Edge Functions**: Fluxo completo de convite de membros por e-mail, processado nativamente via **Supabase Edge Functions (Deno)**.
+3. **Personalização Total do Funil**: Interface para trocar nomes e **paletas de cores dinâmicas** das etapas do funil, com reflexo imediato no Kanban e Dashboard.
+4. **Geração Automática (Trigger-based AI)**: Automação que dispara a criação de mensagens personalizadas assim que um lead atinge etapas críticas (Gatilho de Etapa).
+5. **Data Quality Gate**: Validação dinâmica de campos obrigatórios por etapa do funil, garantindo que a IA receba dados de alta qualidade para as abordagens.
 
 ---
 
@@ -30,35 +30,43 @@ Além dos requisitos básicos, este sistema implementa:
 | **Leads** | Campos Personalizados por Workspace | ✅ |
 | **Leads** | Validação de campos obrigatórios por etapa | ✅ |
 | **Gestão** | Convite de membros via e-mail (Edge Functions) | ✅ |
-| **Analytics** | Dashboard com métricas acumulativas e logs | ✅ |
+| **Analytics** | Dashboard com métricas em tempo real e logs | ✅ |
 
 ---
 
 ## 🛠️ Tecnologias Utilizadas
 
 - **Core:** React 18, TypeScript, Vite.
-- **UI/UX:** Tailwind CSS, shadcn/ui, Lucide Icons, Framer Motion (animações).
-- **Backend-as-a-Service:** [Supabase](https://supabase.com/) (Auth, DB, Storage).
-- **Serverless:** [Supabase Edge Functions](https://supabase.com/edge-functions) (TypeScript/Deno).
+- **UI/UX:** Tailwind CSS, shadcn/ui, Lucide Icons, Framer Motion.
+- **Backend-as-a-Service:** [Supabase](https://supabase.com/).
+- **Serverless:** [Supabase Edge Functions](https://supabase.com/edge-functions).
 - **Inteligência Artificial:** [Google Gemini 2.5 Flash Lite](https://ai.google.dev/).
-- **Gerenciamento de Estado:** TanStack Query (React Query) para sincronização de dados.
+- **Gerenciamento de Estado:** TanStack Query.
 
 ---
 
 ## 📐 Decisões Técnicas & Arquitetura
 
-### 1. Multi-tenancy e Isolamento
-Utilizamos o conceito de **Organization Context**. O usuário logado possui um `context` que dita qual workspace está ativo. Todas as queries ao banco são protegidas pelo **Row Level Security (RLS)** do PostgreSQL, garantindo que mesmo se a chave anon for exposta, os dados de outros workspaces permaneçam inacessíveis.
+### 1. Estrutura do Banco de Dados
+A base foi construída em PostgreSQL focada em escalabilidade. As principais entidades são:
+- **Workspaces**: A unidade raiz do isolamento.
+- **Members**: Define a relação entre usuários e workspaces com papéis (admin/membro).
+- **Leads & Custom Fields**: Sistema flexível que permite ao usuário criar campos extras sem alterar o esquema do banco.
+- **Campaigns**: Define o contexto de abordagem e os triggers de automação.
+- **Activity Logs**: Auditoria de cada ação relevante realizada no sistema.
 
-### 2. Convites e Colaboração (Edge Functions)
-Para garantir segurança e performance, a lógica de convite de membros foi movida para o backend. Utilizamos **Edge Functions** para:
-- Validar se o usuário já existe.
-- Criar vínculos seguros de convite.
-- Enviar notificações (simulado/logado).
-- Processar o "Aceite" garantindo a consistência do banco.
+### 2. Multi-tenancy e Isolamento (RLS)
+Utilizamos **Row Level Security (RLS)**. Cada tabela possui políticas que verificam se o `auth.uid()` do usuário pertence ao `workspace_id` do registro. Isso garante que os dados permaneçam totalmente isolados a nível de banco de dados.
 
-### 3. Engine de IA (Gemini API)
-A integração com o Gemini foi feita de forma estruturada. Passamos não apenas os dados fixos do lead, mas também o **Contexto da Campanha** e o **Prompt Customizado** definido pelo usuário, o que permite que a IA responda como um "vendedor específico" daquela empresa (Persona Branding).
+### 3. Integração com IA (Orquestração do Gemini)
+A integração foi orquestrada no serviço `aiService.ts`. Injetamos um **Contexto Triplo** no prompt (Dados do Lead + Instruções da Campanha + Tom de Voz da Marca). O uso do modelo **2.5 Flash Lite** foi estratégico pela latência ultra-baixa e excelente janela de contexto para pré-vendas.
+
+---
+
+## 🧠 Desafios & Soluções
+
+1. **Migração Vibe Coding**: Iniciei o protótipo no Lovable para ganhar velocidade na UI, mas rapidamente migrei para o ambiente local para implementar lógicas complexas de Auth, Edge Functions e persistência avançada de dados.
+2. **Qualidade dos Dados vs IA**: Identificamos que a IA gerava mensagens ruins se o lead estivesse incompleto. Solucionamos isso criando o **Gatilho de Validação**: o lead só "viaja" para a etapa de IA se os dados obrigatórios estiverem preenchidos, protegendo a qualidade da automação.
 
 ---
 
@@ -66,7 +74,7 @@ A integração com o Gemini foi feita de forma estruturada. Passamos não apenas
 
 ```bash
 # Clone e instalação
-git clone https://github.com/seu-usuario/funnel-friend-suite.git
+git clone https://github.com/eoivo/funnel-friend-suite.git
 npm install
 
 # Configuração (arquivo .env.local)
@@ -79,4 +87,4 @@ npm run dev
 ```
 
 ---
-Desenvolvido por **Ivo Fernandes** para a Prova Técnica Vibe Coding.
+Desenvolvido por **Ivo Fernandes** para o Desafio Técnico SDR CRM.
