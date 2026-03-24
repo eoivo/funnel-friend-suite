@@ -4,7 +4,6 @@ O **Funnel Friend Suite** é uma plataforma de CRM de alta performance voltada p
 
 ## 📌 Links do Projeto
 - **Aplicação Publicada:** [https://funnel-friend-suite.vercel.app/](https://funnel-friend-suite.vercel.app/)
-- **Vídeo de Demonstração (Drive):** [Assista aqui](https://drive.google.com/file/d/1ZANdY4yYx9XjlmYA-HDnKjWfwUwrKbmB/view?usp=sharing)
 
 ## 🌟 Funcionalidades de Destaque (Diferenciais)
 

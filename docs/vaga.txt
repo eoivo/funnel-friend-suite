@@ -1,0 +1,85 @@
+Desenvolvedor Vibe Coding Full Stack (Júnior/Pleno)
+Remota
+BR
+Sobre a vaga
+Estamos em busca de um(a) Desenvolvedor Vibe Coding Full Stack (Júnior/Pleno) para desenvolver soluções completas — do frontend ao backend — utilizando ferramentas de desenvolvimento assistido por IA.
+Buscamos alguém que já tenha experiência com desenvolvimento de software, que esteja familiarizado com plataformas de vibe coding (como Lovable, Bolt.new) para criação de interfaces, e que tenha conhecimentos de backend para construir integrações. Não é necessário ser especialista em tudo, mas sim ter disposição para aprender e evoluir junto com o time.
+
+Principais responsabilidades
+
+Desenvolver interfaces e aplicações web utilizando plataformas de vibe coding (Lovable, Bolt.new, v0)
+Desenvolver e manter Edge Functions no Supabase utilizando TypeScript/JavaScript
+Integrar plataformas de CRM (Pipedrive, HubSpot, Bitrix) via APIs REST e webhooks
+Integrar plataformas de mensageria e comunicação (WhatsApp Business API, Z-API, ChatGuru, ManyChat)
+Projetar e implementar soluções completas (frontend + backend), aplicando padrões de projeto adequados ao contexto
+Trabalhar com Supabase (PostgreSQL, Auth, Storage, Realtime) e Redis para cache e filas
+Desenvolver e manter integrações com APIs de LLMs (OpenAI, Anthropic, Google) para funcionalidades de IA
+Criar e otimizar prompts para agentes de IA e chatbots inteligentes
+Colaborar com outros times para garantir soluções completas, seguras e eficientes
+Documentar código, APIs e integrações de forma clara e organizada
+Aplicar boas práticas de versionamento com Git
+Requisitos
+Desenvolvimento Full Stack
+
+Experiência com desenvolvimento de software
+Conhecimento em TypeScript/JavaScript para desenvolvimento frontend e backend
+Familiaridade com Supabase (Edge Functions, PostgreSQL, Auth, Storage) ou disposição para aprender
+Experiência básica em integração de APIs REST e webhooks
+Noções de Redis para cache e filas (diferencial se já tiver trabalhado)
+Experiência ou conhecimento em integrações com plataformas de CRM ou mensageria
+Conhecimentos em Git para versionamento de código
+Noções de arquitetura de software e boas práticas de código
+Desenvolvimento com IA (Vibe Coding)
+
+Experiência com plataformas de vibe coding para frontend (Lovable, Bolt.new, v0 by Vercel ou similares)
+Experiência com ferramentas de AI coding assistants (Cursor AI, Claude Code, GitHub Copilot ou similares)
+Noções de prompt engineering para desenvolvimento de software
+Capacidade de revisar, debugar e refinar código gerado por IA
+Soft Skills
+
+Vontade de aprender e se desenvolver
+Proatividade e boa comunicação
+Capacidade de trabalhar em equipe e receber feedbacks
+Diferenciais
+
+Já ter trabalhado com Supabase
+Experiência com integrações de CRM (Pipedrive, HubSpot, Bitrix) ou mensageria (WhatsApp API, Z-API, ChatGuru)
+Conhecimento em React, Next.js ou frameworks frontend modernos
+Interesse em frameworks de agentes de IA (LangChain, CrewAI)
+Noções de APIs de LLMs (OpenAI, Anthropic Claude, Google Gemini)
+Experiência prévia com automação de processos
+Inglês técnico para leitura de documentação
+Benefícios
+
+Remuneração compatível com o mercado
+Modelo de contratação PJ
+Trabalho 100% remoto (home office)
+Ambiente inovador, com autonomia e oportunidades de crescimento
+Mentoria e acompanhamento para desenvolvimento profissional
+Participação em projetos com tecnologias de ponta em IA
+Sobre a empresa
+Muito prazer, nós somos a Expert Integrado
+
+Chegamos para resolver um grande desafio do mercado digital: tirar o peso dos processos manuais e transformar tudo em automações inteligentes.
+
+Em pouco mais de três anos e meio, nos tornamos a maior agência de automação especializada em marketing digital do Brasil. E o que fazemos aqui não é teoria — são resultados reais.
+
+Prova social
+Já aceleramos nomes como Victor Damásio, Bettina Rudolph, Matheus Werner e Tathi Deandhela com automações que geram eficiência e escala.
+
+Ex.: Super SDR → mais leads qualificados, agendas preenchidas e redução de tempo operacional.
+
+Modelos de contratação
+Tecnologia (Eng./Automation/NLP/Integrations) — Júnior/Pleno/Sênior — PJ ou CLT.
+Sucesso do Cliente/Implementação — Pleno/Sênior — PJ ou CLT.
+Produto — Pleno/Sênior — PJ ou CLT.
+Processo seletivo
+Aplicação rápida pelo InHire.
+Entrevista inicial (30 min).
+Desafio prático (simples e realista).
+Conversa final + proposta.
+⏱ Tempo médio: até 2 semanas.
+
+Diversidade & Inclusão
+
+Talento não tem CEP, idade, gênero ou origem. Se você domina a entrega e quer crescer, seja bem-vindo(a).
